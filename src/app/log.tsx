@@ -1,9 +1,9 @@
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { format } from 'date-fns';
+import { format, isSameDay } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Check, ChevronLeft, ChevronRight, Clock3, Minus, Plus } from 'lucide-react-native';
+import { CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Minus, Plus, RotateCcw } from 'lucide-react-native';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
@@ -11,6 +11,7 @@ import { z } from 'zod';
 
 import { AppText, Button, Pill, Screen } from '@/components/ui';
 import { MEETING_TYPE_LABELS, MOOD_CONFIG, REASONS } from '@/domain/constants';
+import { mergeDateTimePart, type DateTimePart } from '@/domain/date-time';
 import { MEETING_TYPES, MOODS, type Mood, type ReasonId } from '@/domain/types';
 import { useAppData } from '@/providers/app-data-provider';
 import { colors, fonts, radius, spacing } from '@/theme/tokens';
@@ -55,6 +56,8 @@ export default function LogMeetingScreen() {
   const duration = useWatch({ control, name: 'durationMinutes' });
   const peopleCount = useWatch({ control, name: 'peopleCount' });
   const meetingType = useWatch({ control, name: 'meetingType' });
+  const pickerMaximum = new Date();
+  const maximumTime = isSameDay(occurredAt, pickerMaximum) ? pickerMaximum : undefined;
 
   const next = async () => {
     if (await trigger()) setStep(2);
@@ -77,13 +80,15 @@ export default function LogMeetingScreen() {
     }
   });
 
-  const onDateChange = (_event: DateTimePickerEvent, selected?: Date) => {
+  const onDateChange = (part: DateTimePart) => (event: DateTimePickerEvent, selected?: Date) => {
     if (Platform.OS === 'android') setShowPicker(null);
-    if (!selected) return;
-    const nextDate = new Date(occurredAt);
-    if (showPicker === 'date') nextDate.setFullYear(selected.getFullYear(), selected.getMonth(), selected.getDate());
-    else nextDate.setHours(selected.getHours(), selected.getMinutes());
-    setOccurredAt(nextDate);
+    if (event.type === 'dismissed' || !selected) return;
+    setOccurredAt((current) => mergeDateTimePart(current, selected, part));
+  };
+
+  const useCurrentTime = () => {
+    setShowPicker(null);
+    setOccurredAt(new Date());
   };
 
   if (loadingEdit) return <Screen topSafe={false}><AppText>Loading meeting…</AppText></Screen>;
@@ -129,11 +134,51 @@ export default function LogMeetingScreen() {
             </Field>
 
             <Field label="When it happened">
-              <View style={styles.dateRow}>
-                <Pill label={format(occurredAt, 'MMM d, yyyy')} onPress={() => setShowPicker('date')} />
-                <Pill label={format(occurredAt, 'h:mm a')} onPress={() => setShowPicker('time')} />
+              <View style={styles.whenCard}>
+                <View style={styles.whenHeader}>
+                  <View style={styles.whenIcon}><CalendarDays size={20} color={colors.orange} /></View>
+                  <View style={styles.whenCopy}>
+                    <AppText variant="title">Meeting start</AppText>
+                    <AppText variant="small" style={{ color: colors.inkSoft }}>Defaults to now. Choose any earlier date and time.</AppText>
+                  </View>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Use current date and time" onPress={useCurrentTime} style={({ pressed }) => [styles.nowButton, pressed && styles.pressed]}>
+                    <RotateCcw size={14} color={colors.orange} />
+                    <AppText variant="small" style={styles.nowButtonText}>Now</AppText>
+                  </Pressable>
+                </View>
+
+                {Platform.OS === 'ios' ? (
+                  <View style={styles.pickerRows}>
+                    <View style={styles.nativePickerRow}>
+                      <View style={styles.pickerLabel}><CalendarDays size={17} color={colors.inkSoft} /><AppText>Date</AppText></View>
+                      <DateTimePicker accessibilityLabel="Select meeting date" value={occurredAt} mode="date" maximumDate={pickerMaximum} onChange={onDateChange('date')} display="compact" themeVariant="dark" accentColor={colors.orange} />
+                    </View>
+                    <View style={styles.nativePickerRow}>
+                      <View style={styles.pickerLabel}><Clock3 size={17} color={colors.inkSoft} /><AppText>Time</AppText></View>
+                      <DateTimePicker accessibilityLabel="Select meeting time" value={occurredAt} mode="time" maximumDate={maximumTime} onChange={onDateChange('time')} display="compact" themeVariant="dark" accentColor={colors.orange} />
+                    </View>
+                  </View>
+                ) : (
+                  <>
+                    <View style={styles.dateRow}>
+                      <Pressable accessibilityRole="button" accessibilityLabel={`Change meeting date, currently ${format(occurredAt, 'MMMM d, yyyy')}`} onPress={() => setShowPicker('date')} style={({ pressed }) => [styles.dateButton, pressed && styles.pressed]}>
+                        <CalendarDays size={18} color={colors.orange} />
+                        <View><AppText variant="label" style={{ color: colors.inkSoft }}>Date</AppText><AppText>{format(occurredAt, 'MMM d, yyyy')}</AppText></View>
+                      </Pressable>
+                      <Pressable accessibilityRole="button" accessibilityLabel={`Change meeting time, currently ${format(occurredAt, 'h:mm a')}`} onPress={() => setShowPicker('time')} style={({ pressed }) => [styles.dateButton, pressed && styles.pressed]}>
+                        <Clock3 size={18} color={colors.orange} />
+                        <View><AppText variant="label" style={{ color: colors.inkSoft }}>Time</AppText><AppText>{format(occurredAt, 'h:mm a')}</AppText></View>
+                      </Pressable>
+                    </View>
+                    {showPicker ? <DateTimePicker value={occurredAt} mode={showPicker} maximumDate={showPicker === 'date' ? pickerMaximum : maximumTime} onChange={onDateChange(showPicker)} display="default" /> : null}
+                  </>
+                )}
+
+                <View style={styles.whenSummary}>
+                  <Clock3 size={14} color={colors.moss} />
+                  <AppText variant="small" style={{ color: colors.inkSoft }}>Saved as {format(occurredAt, "EEEE, MMM d 'at' h:mm a")}</AppText>
+                </View>
               </View>
-              {showPicker ? <DateTimePicker value={occurredAt} mode={showPicker} maximumDate={new Date()} onChange={onDateChange} display={Platform.OS === 'ios' ? 'compact' : 'default'} /> : null}
             </Field>
 
             <Field label="Private note · optional" error={errors.note?.message}>
@@ -204,7 +249,19 @@ const styles = StyleSheet.create({
   counter: { minHeight: 62, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: colors.lineDark, borderRadius: radius.md, backgroundColor: colors.surfaceGlass, paddingHorizontal: 8 },
   counterButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' },
   counterValue: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  dateRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  whenCard: { gap: spacing.md, borderWidth: 1, borderColor: colors.lineDark, borderRadius: radius.md, backgroundColor: colors.surfaceGlass, padding: spacing.md },
+  whenHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  whenIcon: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.orangeSoft },
+  whenCopy: { flex: 1, gap: 2 },
+  nowButton: { minWidth: 64, minHeight: 44, paddingHorizontal: 11, borderWidth: 1, borderColor: 'rgba(255,121,88,0.30)', borderRadius: radius.round, backgroundColor: colors.orangeSoft, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
+  nowButtonText: { color: colors.orange, fontFamily: fonts.bodyBold },
+  pickerRows: { borderTopWidth: 1, borderTopColor: colors.line, borderBottomWidth: 1, borderBottomColor: colors.line },
+  nativePickerRow: { minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+  pickerLabel: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  dateRow: { flexDirection: 'row', gap: 8 },
+  dateButton: { flex: 1, minHeight: 64, paddingHorizontal: 12, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: 'rgba(7,10,18,0.42)', flexDirection: 'row', alignItems: 'center', gap: 10 },
+  whenSummary: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  pressed: { opacity: 0.76, transform: [{ scale: 0.98 }] },
   question: { gap: spacing.md },
   moodGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   moodCard: { width: '48%', minHeight: 104, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surfaceGlass, padding: spacing.md, gap: 5, justifyContent: 'space-between', shadowColor: colors.shadow, shadowOpacity: 0.18, shadowRadius: 12 },
