@@ -164,9 +164,61 @@ export async function getAllSettings(db: SQLiteDatabase): Promise<Record<string,
   return Object.fromEntries(rows.map((row) => [row.key, row.value]));
 }
 
-export async function deleteAllData(db: SQLiteDatabase) {
+export async function restoreMeeting(db: SQLiteDatabase, meeting: Meeting): Promise<Meeting> {
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `INSERT INTO meetings
+        (id, title, occurred_at, duration_minutes, meeting_type, people_count, note, mood, impact_score, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      meeting.id,
+      meeting.title,
+      meeting.occurredAt,
+      meeting.durationMinutes,
+      meeting.meetingType,
+      meeting.peopleCount,
+      meeting.note,
+      meeting.mood,
+      meeting.impactScore,
+      meeting.createdAt,
+      meeting.updatedAt,
+    );
+    for (const reasonId of meeting.reasonIds) {
+      await db.runAsync('INSERT INTO meeting_reasons (meeting_id, reason_id) VALUES (?, ?)', meeting.id, reasonId);
+    }
+  });
+  return meeting;
+}
+
+export async function searchMeetings(db: SQLiteDatabase, query: string): Promise<Meeting[]> {
+  const trimmed = query.trim();
+  if (!trimmed) return getAllMeetings(db);
+  const rows = await db.getAllAsync<MeetingRow>(
+    `${SELECT_MEETINGS} WHERE m.title LIKE ? GROUP BY m.id ORDER BY m.occurred_at DESC`,
+    `%${trimmed}%`,
+  );
+  return rows.map(mapMeeting);
+}
+
+export async function importMeetings(
+  db: SQLiteDatabase,
+  inputs: MeetingInput[],
+  mode: 'merge' | 'replace',
+): Promise<number> {
+  if (mode === 'replace') {
+    await deleteAllData(db);
+  }
+  for (const input of inputs) {
+    await createMeeting(db, input);
+  }
+  return inputs.length;
+}
+
+export async function deleteAllData(db: SQLiteDatabase, options?: { preferences?: boolean }) {
   await db.withTransactionAsync(async () => {
     await db.runAsync('DELETE FROM meeting_reasons');
     await db.runAsync('DELETE FROM meetings');
+    if (options?.preferences) {
+      await db.runAsync('DELETE FROM settings');
+    }
   });
 }

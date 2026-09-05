@@ -26,23 +26,26 @@ export const MEETING_TYPES = [
 
 export type MeetingType = (typeof MEETING_TYPES)[number];
 
-export type ReasonId =
-  | 'clear-outcome'
-  | 'good-facilitation'
-  | 'right-people'
-  | 'fast-decision'
-  | 'useful-discussion'
-  | 'strong-alignment'
-  | 'no-agenda'
-  | 'too-many-people'
-  | 'unclear-ownership'
-  | 'repeated-discussion'
-  | 'no-decision'
-  | 'could-have-been-async'
-  | 'poor-context'
-  | 'dominated-by-one-person'
-  | 'too-long'
-  | 'last-minute-invite';
+export const REASON_IDS = [
+  'clear-outcome',
+  'good-facilitation',
+  'right-people',
+  'fast-decision',
+  'useful-discussion',
+  'strong-alignment',
+  'no-agenda',
+  'too-many-people',
+  'unclear-ownership',
+  'repeated-discussion',
+  'no-decision',
+  'could-have-been-async',
+  'poor-context',
+  'dominated-by-one-person',
+  'too-long',
+  'last-minute-invite',
+] as const;
+
+export type ReasonId = (typeof REASON_IDS)[number];
 
 export type Reason = {
   id: ReasonId;
@@ -92,3 +95,31 @@ export type WeekSummary = {
   weekdayScores: { date: string; label: string; score: number }[];
   insights: Insight[];
 };
+
+export type WeekDelta = {
+  previousPulse: number;
+  delta: number;
+  previousClassification: string;
+};
+
+export type SeriesPulse = {
+  key: string;
+  title: string;
+  meetingType: MeetingType;
+  count: number;
+  average: number;
+};
+
+export type WeeklyIntention = {
+  text: string;
+  weekStartIso: string;
+  tried: boolean;
+};
+
+export type ReminderPrefs = {
+  enabled: boolean;
+  hour: number;
+  minute: number;
+};
+
+export type LogOrigin = 'today' | 'history' | 'insights';

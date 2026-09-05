@@ -1,7 +1,7 @@
 import { endOfWeek, startOfWeek } from 'date-fns';
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
-import { generateInsights, summarizeWeek } from '../insights';
+import { generateInsights, summarizeWeek, weekOverWeekDelta } from '../insights';
 import type { Meeting } from '../types';
 
 let counter = 0;
@@ -90,5 +90,33 @@ describe('weekly summary', () => {
     expect(summary.negativeCount).toBe(1);
     expect(summary.topNegativeReason).toBe('no-decision');
     expect(summary.weekdayScores).toHaveLength(7);
+  });
+
+  it('compares two weeks when the previous week has meetings', () => {
+    const current = summarizeWeek([
+      meeting({ occurredAt: new Date(2026, 6, 8, 10).toISOString(), impactScore: 6 }),
+    ], new Date(2026, 6, 6), new Date(2026, 6, 12));
+    const previous = summarizeWeek([
+      meeting({ occurredAt: new Date(2026, 5, 30, 10).toISOString(), impactScore: 1 }),
+    ], new Date(2026, 5, 29), new Date(2026, 6, 5));
+    expect(weekOverWeekDelta(current, previous)?.delta).toBe(5);
+    expect(weekOverWeekDelta(current, { ...previous, meetingCount: 0 })).toBeNull();
+  });
+});
+
+describe('additional insight rules', () => {
+  beforeEach(() => { counter = 0; });
+
+  it('flags a packed negative day', () => {
+    const meetings = [1, 2, 3, 4].map((index) => meeting({
+      occurredAt: new Date(2026, 6, 8, 9 + index).toISOString(),
+      impactScore: -2,
+    }));
+    expect(generateInsights(meetings).map((item) => item.id)).toContain('heavy-day');
+  });
+
+  it('flags draining large rooms', () => {
+    const meetings = [1, 2, 3].map(() => meeting({ peopleCount: 10, impactScore: -2 }));
+    expect(generateInsights(meetings).map((item) => item.id)).toContain('large-rooms');
   });
 });

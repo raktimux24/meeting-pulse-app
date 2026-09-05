@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
-import { Settings2 } from 'lucide-react-native';
+import { Plus, Settings2 } from 'lucide-react-native';
 import type { PropsWithChildren, ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import {
@@ -18,7 +18,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { formatSigned } from '@/domain/format';
 import { colors, fonts, gradients, radius, spacing } from '@/theme/tokens';
+
+export { formatSigned };
 
 export function AppText({
   children,
@@ -86,11 +89,12 @@ export function Screen({
   );
 }
 
-export function Header({ eyebrow, title, subtitle, onSettings, action }: {
+export function Header({ eyebrow, title, subtitle, onSettings, onLog, action }: {
   eyebrow: string;
   title: string;
   subtitle?: string;
   onSettings?: () => void;
+  onLog?: () => void;
   action?: ReactNode;
 }) {
   return (
@@ -100,11 +104,20 @@ export function Header({ eyebrow, title, subtitle, onSettings, action }: {
         <AppText variant="display">{title}</AppText>
         {subtitle ? <AppText style={styles.muted}>{subtitle}</AppText> : null}
       </View>
-      {action ?? (onSettings ? (
-        <Pressable accessibilityRole="button" accessibilityLabel="Open settings" hitSlop={8} onPress={onSettings} style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}>
-          <Settings2 color={colors.ink} size={21} strokeWidth={1.8} />
-        </Pressable>
-      ) : null)}
+      {action ?? (
+        <View style={styles.headerActions}>
+          {onLog ? (
+            <Pressable accessibilityRole="button" accessibilityLabel="Log a meeting" hitSlop={8} onPress={onLog} style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}>
+              <Plus color={colors.ink} size={21} strokeWidth={1.8} />
+            </Pressable>
+          ) : null}
+          {onSettings ? (
+            <Pressable accessibilityRole="button" accessibilityLabel="Open settings" hitSlop={8} onPress={onSettings} style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}>
+              <Settings2 color={colors.ink} size={21} strokeWidth={1.8} />
+            </Pressable>
+          ) : null}
+        </View>
+      )}
     </View>
   );
 }
@@ -160,7 +173,7 @@ export function Pill({ label, selected = false, onPress, tone = 'default' }: {
   const toneStyle = tone === 'positive' ? styles.pillPositive : tone === 'negative' ? styles.pillNegative : undefined;
   const textTone = tone === 'positive' ? colors.moss : tone === 'negative' ? colors.wine : colors.ink;
   return (
-    <Pressable accessibilityRole={onPress ? 'button' : undefined} accessibilityState={{ selected }} onPress={onPress} disabled={!onPress} style={({ pressed }) => [styles.pill, toneStyle, selected && styles.pillSelected, pressed && styles.pressed]}>
+    <Pressable accessibilityRole={onPress ? 'button' : undefined} accessibilityState={{ selected }} accessibilityLabel={`${label}${selected ? ', selected' : ''}`} onPress={onPress} disabled={!onPress} style={({ pressed }) => [styles.pill, toneStyle, selected && styles.pillSelected, pressed && styles.pressed]}>
       <AppText variant="small" style={{ color: selected ? colors.white : textTone, fontFamily: fonts.bodyMedium }}>{label}</AppText>
     </Pressable>
   );
@@ -189,9 +202,19 @@ export function EmptyState({ title, body, action }: { title: string; body: strin
   );
 }
 
-export function formatSigned(value: number) {
-  const normalized = Number.isInteger(value) ? value.toString() : value.toFixed(1);
-  return value > 0 ? `+${normalized}` : normalized;
+export function LoadingState({ label }: { label: string }) {
+  return (
+    <View style={styles.statusBlock}>
+      <ActivityIndicator color={colors.orange} />
+      <AppText style={styles.muted}>{label}</AppText>
+    </View>
+  );
+}
+
+export function NotFoundState({ title, body, action }: { title: string; body: string; action?: ReactNode }) {
+  return (
+    <EmptyState title={title} body={body} action={action} />
+  );
 }
 
 const styles = StyleSheet.create({
@@ -205,6 +228,8 @@ const styles = StyleSheet.create({
   eyebrow: { color: colors.orange, marginBottom: 6 },
   header: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md },
   headerCopy: { flex: 1, gap: 4 },
+  headerActions: { flexDirection: 'row', gap: 8 },
+  statusBlock: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, paddingVertical: spacing.xxl },
   iconButton: { width: 48, height: 48, borderRadius: 24, borderWidth: 1, borderColor: colors.lineDark, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceGlass, shadowColor: colors.shadow, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.28, shadowRadius: 16, elevation: 5 },
   pressed: { opacity: 0.78, transform: [{ scale: 0.975 }] },
   card: { borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surfaceGlass, padding: spacing.lg, shadowColor: colors.shadow, shadowOffset: { width: 0, height: 14 }, shadowOpacity: 0.22, shadowRadius: 24, elevation: 6 },

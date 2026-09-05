@@ -28,7 +28,15 @@
       "favicon": "./assets/images/icon.png"
     },
     "plugins": [
-      "expo-router",
+      [
+        "expo-router",
+        {
+          "headers": {
+            "Cross-Origin-Embedder-Policy": "credentialless",
+            "Cross-Origin-Opener-Policy": "same-origin"
+          }
+        }
+      ],
       [
         "expo-splash-screen",
         {
@@ -37,7 +45,15 @@
       ],
       "expo-sqlite",
       "expo-sharing",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-document-picker",
+      [
+        "expo-notifications",
+        {
+          "color": "#FF7958",
+          "defaultChannel": "meeting-pulse-daily"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

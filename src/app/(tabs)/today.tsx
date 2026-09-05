@@ -5,13 +5,14 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { MeetingCard } from '@/components/meeting-card';
+import { UndoBar } from '@/components/undo-bar';
 import { AppText, Button, EmptyState, formatSigned, GradientCard, Header, Screen, SectionTitle } from '@/components/ui';
 import type { Meeting } from '@/domain/types';
 import { useAppData } from '@/providers/app-data-provider';
 import { colors, fonts, gradients, spacing } from '@/theme/tokens';
 
 export default function TodayScreen() {
-  const { getRange, revision } = useAppData();
+  const { getRange, revision, intention, markIntentionTried } = useAppData();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
 
   useEffect(() => {
@@ -23,15 +24,25 @@ export default function TodayScreen() {
   const positive = meetings.filter((meeting) => meeting.impactScore > 0).length;
   const negative = meetings.filter((meeting) => meeting.impactScore < 0).length;
   const neutral = meetings.length - positive - negative;
-
   return (
     <Screen>
       <Header
         eyebrow={format(new Date(), 'EEEE · MMMM d')}
         title="Today’s pulse"
         subtitle={meetings.length ? 'A quick read on the cost and return of your meeting day.' : 'Notice the effect—not just the time.'}
+        onLog={() => router.push({ pathname: '/log', params: { from: 'today' } })}
         onSettings={() => router.push('/settings')}
       />
+
+      <UndoBar />
+
+      {intention && !intention.tried ? (
+        <GradientCard colors={gradients.glass} style={styles.intentionCard}>
+          <AppText variant="label" style={{ color: colors.orange }}>This week’s intention</AppText>
+          <AppText variant="title">{intention.text}</AppText>
+          <Button label="I tried this" variant="secondary" onPress={() => { void markIntentionTried(); }} />
+        </GradientCard>
+      ) : null}
 
       <GradientCard colors={gradients.hero} style={styles.pulseCard}>
         <View pointerEvents="none" style={styles.heroGlow} />
@@ -44,7 +55,7 @@ export default function TodayScreen() {
               {formatSigned(pulse)}
             </AppText>
           </View>
-          <View style={[styles.pulseDisc, { borderColor: pulse > 0 ? colors.moss : pulse < 0 ? colors.wine : colors.amber }]}> 
+          <View style={[styles.pulseDisc, { borderColor: pulse > 0 ? colors.moss : pulse < 0 ? colors.wine : colors.amber }]}>
             <ArrowUpRight size={25} color={colors.white} style={{ transform: [{ rotate: pulse < 0 ? '90deg' : pulse === 0 ? '45deg' : '0deg' }] }} />
           </View>
         </View>
@@ -52,23 +63,23 @@ export default function TodayScreen() {
         <View style={styles.metrics}>
           <Metric value={`${meetings.length}`} label="Meetings" />
           <Metric value={totalMinutes >= 60 ? `${(totalMinutes / 60).toFixed(totalMinutes % 60 ? 1 : 0)}h` : `${totalMinutes}m`} label="In calls" />
-          <Metric value={`${positive}/${neutral}/${negative}`} label="Up · even · down" />
+          <Metric value={`${positive}/${neutral}/${negative}`} label="Returned · neutral · cost" />
         </View>
       </GradientCard>
 
-      <Button label="Log a meeting" onPress={() => router.push('/log')} icon={<Plus size={20} color={colors.white} />} />
+      <Button label="Log a meeting" onPress={() => router.push({ pathname: '/log', params: { from: 'today' } })} icon={<Plus size={20} color={colors.white} />} />
 
       <View style={styles.list}>
         <SectionTitle eyebrow="Daily log" title={meetings.length ? `${meetings.length} reflection${meetings.length === 1 ? '' : 's'}` : 'Your meetings'} />
         {meetings.length ? (
           meetings.map((meeting) => (
-            <MeetingCard key={meeting.id} meeting={meeting} onPress={() => router.push({ pathname: '/meeting/[id]', params: { id: meeting.id } })} />
+            <MeetingCard key={meeting.id} meeting={meeting} onPress={() => router.push({ pathname: '/meeting/[id]', params: { id: meeting.id, from: 'today' } })} />
           ))
         ) : (
           <EmptyState
             title="No signal yet"
             body="After your next meeting, take 20 seconds to capture how it changed your energy or clarity."
-            action={<Button label="Log the first one" variant="secondary" onPress={() => router.push('/log')} />}
+            action={<Button label="Log the first one" variant="secondary" onPress={() => router.push({ pathname: '/log', params: { from: 'today' } })} />}
           />
         )}
       </View>
@@ -78,7 +89,7 @@ export default function TodayScreen() {
 
 function Metric({ value, label }: { value: string; label: string }) {
   return (
-    <View style={styles.metric}>
+    <View style={styles.metric} accessibilityLabel={`${value} ${label}`}>
       <AppText variant="title" style={{ fontFamily: fonts.bodyBold }}>{value}</AppText>
       <AppText variant="small" style={{ color: colors.inkSoft }}>{label}</AppText>
     </View>
@@ -93,6 +104,7 @@ const styles = StyleSheet.create({
   metrics: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm },
   metric: { flex: 1, gap: 2 },
   list: { gap: spacing.md },
+  intentionCard: { gap: spacing.md },
   heroGlow: { position: 'absolute', width: 180, height: 180, borderRadius: 90, backgroundColor: colors.orange, opacity: 0.11, right: -58, top: -70, shadowColor: colors.orange, shadowOpacity: 0.9, shadowRadius: 70 },
   orbitOne: { position: 'absolute', width: 170, height: 170, borderRadius: 85, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', right: -38, top: -42 },
   orbitTwo: { position: 'absolute', width: 110, height: 110, borderRadius: 55, borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', right: -9, top: -11 },

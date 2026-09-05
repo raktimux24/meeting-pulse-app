@@ -1,22 +1,25 @@
 import { ArrowRight, LockKeyhole, Sparkles } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 
-import { AppText, Button, Screen } from '@/components/ui';
+import { AppText, Button, Card, Screen } from '@/components/ui';
 import { useAppData } from '@/providers/app-data-provider';
 import { colors, fonts, gradients, radius, spacing } from '@/theme/tokens';
 
 export default function OnboardingScreen() {
-  const { completeOnboarding } = useAppData();
+  const { completeOnboarding, onboardingComplete } = useAppData();
   const { fontScale, height } = useWindowDimensions();
   const compact = height < 800;
   const allowScrolling = height < 720 || fontScale > 1.15;
+  const [page, setPage] = useState<1 | 2>(1);
+  const replaying = onboardingComplete;
 
-  const continueToApp = async () => {
-    await completeOnboarding();
+  const finish = async (openLog: boolean) => {
+    if (!replaying) await completeOnboarding();
     router.replace('/(tabs)/today');
-    setTimeout(() => router.push('/log'), 0);
+    if (openLog) setTimeout(() => router.push({ pathname: '/log', params: { from: 'today' } }), 0);
   };
 
   return (
@@ -26,29 +29,55 @@ export default function OnboardingScreen() {
         <AppText variant="label">Meeting Pulse</AppText>
       </View>
 
-      <View style={[styles.heroVisual, compact && styles.heroVisualCompact]}>
-        <View style={styles.visualGlow} />
-        <View style={[styles.orbit, styles.orbitOuter]} />
-        <View style={[styles.orbit, styles.orbitInner]} />
-        <LinearGradient colors={gradients.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.scoreBubble}>
-          <AppText variant="label" style={{ color: 'rgba(255,255,255,0.78)' }}>Live signal</AppText>
-          <AppText variant="hero" style={{ color: colors.white, fontSize: 58, lineHeight: 62 }}>−6</AppText>
-        </LinearGradient>
-        <View style={styles.signalTag}><Sparkles size={15} color={colors.orange} /><AppText variant="small">No decision</AppText></View>
-        <View style={styles.returnTag}><View style={styles.returnDot} /><AppText variant="small">Clarity −2</AppText></View>
-      </View>
+      {page === 1 ? (
+        <>
+          <View style={[styles.heroVisual, compact && styles.heroVisualCompact]}>
+            <View style={styles.visualGlow} />
+            <View style={[styles.orbit, styles.orbitOuter]} />
+            <View style={[styles.orbit, styles.orbitInner]} />
+            <LinearGradient colors={gradients.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.scoreBubble}>
+              <AppText variant="label" style={{ color: 'rgba(255,255,255,0.78)' }}>Live signal</AppText>
+              <AppText variant="hero" style={{ color: colors.white, fontSize: 58, lineHeight: 62 }}>−6</AppText>
+            </LinearGradient>
+            <View style={styles.signalTag}><Sparkles size={15} color={colors.orange} /><AppText variant="small">No decision</AppText></View>
+            <View style={styles.returnTag}><View style={styles.returnDot} /><AppText variant="small">Clarity −2</AppText></View>
+          </View>
 
-      <View style={styles.copy}>
-        <AppText variant="hero" style={compact && styles.headingCompact}>Know what your meetings really cost.</AppText>
-        <AppText style={[styles.subtitle, compact && styles.subtitleCompact]}>Your calendar tracks time. Meeting Pulse tracks the energy, clarity, and momentum behind it.</AppText>
-      </View>
+          <View style={styles.copy}>
+            <AppText variant="hero" style={compact && styles.headingCompact}>Know what your meetings really cost.</AppText>
+            <AppText style={[styles.subtitle, compact && styles.subtitleCompact]}>Your calendar tracks time. Meeting Pulse tracks the energy, clarity, and momentum behind it.</AppText>
+          </View>
+        </>
+      ) : (
+        <View style={styles.copy}>
+          <AppText variant="hero" style={compact && styles.headingCompact}>A score, not a verdict.</AppText>
+          <AppText style={[styles.subtitle, compact && styles.subtitleCompact]}>Mood × duration + the reasons you tap. Weekly notes are simple rules on this device—not a model, and not a performance review.</AppText>
+          <Card style={styles.example}>
+            <AppText variant="label" style={{ color: colors.orange }}>Example</AppText>
+            <AppText variant="title">Clear (+2) × 30 min (1.2×) + Clear outcome (+2) = +4.4</AppText>
+            <AppText style={{ color: colors.inkSoft }}>Three reflections are enough to surface the first weekly pattern.</AppText>
+          </Card>
+        </View>
+      )}
 
       <View style={[styles.privacyRow, compact && styles.privacyRowCompact]}>
         <LockKeyhole size={17} color={colors.moss} />
         <AppText variant="small" style={{ flex: 1, color: colors.inkSoft }}>Private by design. Your reflections stay on this device.</AppText>
       </View>
 
-      <Button label="Track my first meeting" onPress={continueToApp} icon={<ArrowRight size={19} color={colors.white} />} />
+      <View style={styles.pager} accessibilityRole="tablist">
+        <View style={[styles.dot, page === 1 && styles.dotActive]} />
+        <View style={[styles.dot, page === 2 && styles.dotActive]} />
+      </View>
+
+      {page === 1 ? (
+        <Button label="How the score works" onPress={() => setPage(2)} icon={<ArrowRight size={19} color={colors.white} />} />
+      ) : (
+        <View style={styles.actions}>
+          <Button label={replaying ? 'Back to the app' : 'Track my first meeting'} onPress={() => finish(!replaying)} icon={<ArrowRight size={19} color={colors.white} />} />
+          {!replaying ? <Button label="Explore first" variant="ghost" onPress={() => finish(false)} /> : null}
+        </View>
+      )}
     </Screen>
   );
 }
@@ -73,6 +102,11 @@ const styles = StyleSheet.create({
   headingCompact: { fontSize: 37, lineHeight: 39 },
   subtitle: { color: colors.inkSoft, fontSize: 17, lineHeight: 26, fontFamily: fonts.body },
   subtitleCompact: { fontSize: 16, lineHeight: 23 },
+  example: { gap: spacing.sm, marginTop: spacing.sm },
   privacyRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: spacing.md, borderRadius: radius.md, backgroundColor: 'rgba(114,230,192,0.07)', borderWidth: 1, borderColor: 'rgba(114,230,192,0.16)' },
   privacyRowCompact: { padding: 12 },
+  pager: { flexDirection: 'row', gap: 8, justifyContent: 'center' },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.lineDark },
+  dotActive: { backgroundColor: colors.orange, width: 18 },
+  actions: { gap: 10 },
 });

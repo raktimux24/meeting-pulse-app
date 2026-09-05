@@ -20,7 +20,7 @@ export function getPulseClassification(score: number): string {
   if (score >= 5) return 'Healthy Meeting Week';
   if (score > -5) return 'Neutral Week';
   if (score > -20) return 'Draining Week';
-  return 'Meeting Damage Week';
+  return 'Heavy meeting week';
 }
 
 export function getImpactLabel(score: number): string {

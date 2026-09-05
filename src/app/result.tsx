@@ -1,23 +1,44 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowRight, Check, Plus } from 'lucide-react-native';
+import { ArrowRight, Check, Plus, RotateCcw } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { AppText, Button, Card, formatSigned, Screen } from '@/components/ui';
+import { AppText, Button, Card, LoadingState, NotFoundState, formatSigned, Screen } from '@/components/ui';
 import { MOOD_CONFIG, REASON_MAP } from '@/domain/constants';
+import { originPath } from '@/domain/format';
 import { getDurationMultiplier, getImpactLabel, getMeetingSuggestion } from '@/domain/scoring';
 import type { Meeting } from '@/domain/types';
 import { useAppData } from '@/providers/app-data-provider';
 import { colors, gradients, radius, spacing } from '@/theme/tokens';
 
 export default function ResultScreen() {
-  const { id, edited } = useLocalSearchParams<{ id: string; edited?: string }>();
+  const { id, edited, from } = useLocalSearchParams<{ id: string; edited?: string; from?: string }>();
   const { getById } = useAppData();
   const [meeting, setMeeting] = useState<Meeting | null>(null);
-  useEffect(() => { if (id) getById(id).then(setMeeting); }, [getById, id]);
+  const [missing, setMissing] = useState(!id);
 
-  if (!meeting) return <Screen><AppText>Building your result…</AppText></Screen>;
+  useEffect(() => {
+    if (!id) return;
+    getById(id).then((found) => {
+      if (!found) setMissing(true);
+      else setMeeting(found);
+    });
+  }, [getById, id]);
+
+  if (missing) {
+    return (
+      <Screen>
+        <NotFoundState
+          title="This result is gone"
+          body="The reflection could not be found on this device."
+          action={<Button label="Back to Today" onPress={() => router.replace('/(tabs)/today')} />}
+        />
+      </Screen>
+    );
+  }
+
+  if (!meeting) return <Screen><LoadingState label="Building your result…" /></Screen>;
 
   const positive = meeting.impactScore > 0;
   const neutral = meeting.impactScore === 0;
@@ -25,6 +46,7 @@ export default function ResultScreen() {
   const moodBase = MOOD_CONFIG[meeting.mood].score;
   const multiplier = getDurationMultiplier(meeting.durationMinutes);
   const modifier = meeting.reasonIds.reduce((sum, reasonId) => sum + REASON_MAP[reasonId].modifier, 0);
+  const home = originPath(from);
 
   return (
     <Screen contentStyle={styles.content}>
@@ -34,7 +56,7 @@ export default function ResultScreen() {
         <AppText variant="display">{meeting.title}</AppText>
       </View>
 
-      <LinearGradient colors={meeting.impactScore >= 0 ? gradients.positive : gradients.negative} style={[styles.scoreOrb, { borderColor: tone }]}> 
+      <LinearGradient colors={meeting.impactScore >= 0 ? gradients.positive : gradients.negative} style={[styles.scoreOrb, { borderColor: tone }]}>
         <View pointerEvents="none" style={[styles.orbGlow, { backgroundColor: tone, shadowColor: tone }]} />
         <AppText variant="label" style={{ color: tone }}>Meeting impact</AppText>
         <AppText variant="hero" style={{ color: tone, fontSize: 66, lineHeight: 70 }} accessibilityLabel={`${positive ? 'positive' : neutral ? 'neutral' : 'negative'} ${Math.abs(meeting.impactScore)} meeting impact`}>{formatSigned(meeting.impactScore)}</AppText>
@@ -58,8 +80,10 @@ export default function ResultScreen() {
       </Card>
 
       <View style={styles.actions}>
-        <Button label="Done" onPress={() => router.replace('/(tabs)/today')} icon={<ArrowRight size={19} color={colors.white} />} />
-        <Button label="Log another" variant="secondary" onPress={() => router.replace('/log')} icon={<Plus size={19} color={colors.ink} />} />
+        <Button label="Done" onPress={() => router.replace(home)} icon={<ArrowRight size={19} color={colors.white} />} />
+        <Button label="View reflection" variant="secondary" onPress={() => router.replace({ pathname: '/meeting/[id]', params: { id: meeting.id, from: from ?? 'today' } })} />
+        <Button label="Edit again" variant="ghost" onPress={() => router.replace({ pathname: '/log', params: { id: meeting.id, from: from ?? 'today' } })} icon={<RotateCcw size={18} color={colors.ink} />} />
+        <Button label="Log another" variant="ghost" onPress={() => router.replace({ pathname: '/log', params: { from: from ?? 'today' } })} icon={<Plus size={19} color={colors.ink} />} />
       </View>
     </Screen>
   );

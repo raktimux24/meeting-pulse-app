@@ -1,18 +1,21 @@
 import Constants from 'expo-constants';
+import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { format } from 'date-fns';
-import { Database, Download, Info, LockKeyhole, Trash2 } from 'lucide-react-native';
+import { Database, Download, Info, LockKeyhole, Trash2, Upload } from 'lucide-react-native';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
 import { AppText, Button, Card, Pill, Screen, SectionTitle } from '@/components/ui';
 import { makeDemoMeetings } from '@/data/fixtures';
+import { parseExportJson } from '@/domain/import-export';
 import { useAppData } from '@/providers/app-data-provider';
 import { colors, spacing } from '@/theme/tokens';
 
 export default function SettingsScreen() {
-  const { getAll, removeAll, create, weekStartsOn, changeWeekStart } = useAppData();
+  const { getAll, removeAll, create, importData, weekStartsOn, changeWeekStart, reminder, saveReminder } = useAppData();
   const [working, setWorking] = useState(false);
 
   const exportData = async () => {
@@ -34,12 +37,52 @@ export default function SettingsScreen() {
     }
   };
 
-  const confirmDeleteAll = () => Alert.alert(
-    'Delete every reflection?',
-    'All meeting history will be permanently removed from this device. This cannot be undone.',
+  const importFromFile = async () => {
+    setWorking(true);
+    try {
+      const picked = await DocumentPicker.getDocumentAsync({ type: 'application/json', copyToCacheDirectory: true });
+      if (picked.canceled || !picked.assets[0]) return;
+      const text = await new File(picked.assets[0].uri).text();
+      const preview = parseExportJson(text);
+      if (!preview.imported) {
+        Alert.alert('Nothing to import', preview.skipped ? `${preview.skipped} row${preview.skipped === 1 ? '' : 's'} could not be read.` : 'This file has no meetings.');
+        return;
+      }
+      Alert.alert(
+        `Import ${preview.imported} meeting${preview.imported === 1 ? '' : 's'}?`,
+        `${preview.skipped ? `${preview.skipped} invalid row${preview.skipped === 1 ? '' : 's'} will be skipped. ` : ''}Merge keeps what you have. Replace removes current reflections first.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Merge', onPress: () => { void finishImport(preview.meetings, 'merge'); } },
+          { text: 'Replace', style: 'destructive', onPress: () => { void finishImport(preview.meetings, 'replace'); } },
+        ],
+      );
+    } catch (error) {
+      Alert.alert('Import failed', error instanceof Error ? error.message : 'Please choose a Meeting Pulse export.');
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const finishImport = async (meetings: Parameters<typeof importData>[0], mode: 'merge' | 'replace') => {
+    setWorking(true);
+    try {
+      const count = await importData(meetings, mode);
+      Alert.alert('Import complete', `${count} reflection${count === 1 ? '' : 's'} ${mode === 'replace' ? 'replaced your archive' : 'were added'}.`);
+    } catch {
+      Alert.alert('Import failed', 'Your existing data is still on this device.');
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const confirmDelete = () => Alert.alert(
+    'Delete data on this device?',
+    'Choose how much to remove. This cannot be undone.',
     [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete all', style: 'destructive', onPress: async () => { await removeAll(); Alert.alert('Data deleted', 'Your meeting history is now empty.'); } },
+      { text: 'Meetings only', style: 'destructive', onPress: async () => { await removeAll(); Alert.alert('Data deleted', 'Your meeting history is now empty.'); } },
+      { text: 'Meetings and preferences', style: 'destructive', onPress: async () => { await removeAll({ preferences: true }); Alert.alert('Workspace reset', 'Meetings and preferences were cleared.'); } },
     ],
   );
 
@@ -53,6 +96,14 @@ export default function SettingsScreen() {
     }
   };
 
+  const toggleReminder = async (enabled: boolean) => {
+    try {
+      await saveReminder({ ...reminder, enabled });
+    } catch (error) {
+      Alert.alert('Reminder not set', error instanceof Error ? error.message : 'Please try again.');
+    }
+  };
+
   return (
     <Screen topSafe={false}>
       <View style={styles.intro}>
@@ -62,7 +113,7 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.section}>
-        <SectionTitle eyebrow="Calendar" title="Week display" />
+        <SectionTitle eyebrow="Week display" title="How weeks are grouped" />
         <Card style={styles.preference}>
           <View style={{ flex: 1, gap: 4 }}><AppText variant="title">Week starts on</AppText><AppText style={{ color: colors.inkSoft }}>Used for Insights and weekly reports.</AppText></View>
           <View style={styles.pills}>
@@ -73,21 +124,57 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.section}>
+        <SectionTitle eyebrow="Habit" title="End-of-day reminder" />
+        <Card style={styles.preference}>
+          <View style={{ flex: 1, gap: 4 }}>
+            <AppText variant="title">Local reminder</AppText>
+            <AppText style={{ color: colors.inkSoft }}>A single on-device prompt. Off by default. No calendar is read.</AppText>
+          </View>
+          <View style={styles.pills}>
+            <Pill label="Off" selected={!reminder.enabled} onPress={() => { void toggleReminder(false); }} />
+            <Pill label="On" selected={reminder.enabled} onPress={() => { void toggleReminder(true); }} />
+          </View>
+        </Card>
+        {reminder.enabled ? (
+          <View style={styles.pills}>
+            {[17, 18, 19, 20].map((hour) => (
+              <Pill
+                key={hour}
+                label={`${hour === 12 ? 12 : hour % 12} ${hour >= 12 ? 'PM' : 'AM'}`}
+                selected={reminder.hour === hour}
+                onPress={() => { void saveReminder({ enabled: true, hour, minute: 0 }); }}
+              />
+            ))}
+          </View>
+        ) : null}
+      </View>
+
+      <View style={styles.section}>
         <SectionTitle eyebrow="Method" title="How scoring works" />
         <Card style={styles.methodCard}>
           <View style={styles.iconDisc}><Info size={20} color={colors.orange} /></View>
-          <View style={{ flex: 1, gap: 5 }}><AppText variant="title">Mood × duration + reasons</AppText><AppText style={{ color: colors.inkSoft }}>A meeting’s stored score combines how it left you feeling, how long it ran, and the signals you selected. The score is not a clinical or performance assessment.</AppText></View>
+          <View style={{ flex: 1, gap: 5 }}>
+            <AppText variant="title">Mood × duration + reasons</AppText>
+            <AppText style={{ color: colors.inkSoft }}>A meeting’s stored score combines how it left you feeling, how long it ran, and the signals you selected. Weekly notes are rule-based on this device. The score is not a clinical or performance assessment.</AppText>
+          </View>
         </Card>
+        <Card style={styles.exampleCard}>
+          <AppText variant="label" style={{ color: colors.orange }}>Worked example</AppText>
+          <AppText variant="title">Clear (+2) × 30 min (1.2×) + Clear outcome (+2) = +4.4</AppText>
+          <AppText style={{ color: colors.inkSoft }}>Longer meetings amplify the mood. Reasons nudge the result up or down. That is the whole model.</AppText>
+        </Card>
+        <Button label="Replay the scoring tour" variant="ghost" onPress={() => router.push('/onboarding')} />
       </View>
 
       <View style={styles.section}>
         <SectionTitle eyebrow="Your data" title="Private and portable" />
         <Card style={styles.privacyCard}>
           <LockKeyhole size={23} color={colors.moss} />
-          <View style={{ flex: 1, gap: 4 }}><AppText variant="title">Stored only on this device</AppText><AppText style={{ color: colors.inkSoft }}>No account, analytics, cloud sync, or network request is required.</AppText></View>
+          <View style={{ flex: 1, gap: 4 }}><AppText variant="title">Stored only on this device</AppText><AppText style={{ color: colors.inkSoft }}>No account, analytics, cloud sync, or network request is required. Export and import are how you move a backup yourself.</AppText></View>
         </Card>
         <Button label="Export data as JSON" variant="secondary" onPress={exportData} loading={working} icon={<Download size={18} color={colors.ink} />} />
-        <Button label="Delete all meeting data" variant="danger" onPress={confirmDeleteAll} icon={<Trash2 size={18} color={colors.wine} />} />
+        <Button label="Import data from JSON" variant="secondary" onPress={importFromFile} loading={working} icon={<Upload size={18} color={colors.ink} />} />
+        <Button label="Delete data on this device" variant="danger" onPress={confirmDelete} icon={<Trash2 size={18} color={colors.wine} />} />
       </View>
 
       {__DEV__ ? (
@@ -109,8 +196,9 @@ const styles = StyleSheet.create({
   intro: { gap: 5 },
   section: { gap: spacing.md },
   preference: { gap: spacing.md },
-  pills: { flexDirection: 'row', gap: 8 },
+  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   methodCard: { flexDirection: 'row', gap: spacing.md },
+  exampleCard: { gap: spacing.sm },
   iconDisc: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.orangeSoft, alignItems: 'center', justifyContent: 'center' },
   privacyCard: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, backgroundColor: colors.mossSoft },
   footer: { alignItems: 'center', gap: 4, paddingTop: spacing.lg },

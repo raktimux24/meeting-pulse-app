@@ -38,7 +38,7 @@ describe('pulse labels', () => {
     [-4.9, 'Neutral Week'],
     [-5, 'Draining Week'],
     [-19.9, 'Draining Week'],
-    [-20, 'Meeting Damage Week'],
+    [-20, 'Heavy meeting week'],
   ])('classifies %s as %s', (score, label) => {
     expect(getPulseClassification(score as number)).toBe(label);
   });

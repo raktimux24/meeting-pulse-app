@@ -2,7 +2,8 @@ import { eachDayOfInterval, format, isWithinInterval } from 'date-fns';
 
 import { MEETING_TYPE_LABELS, REASON_MAP } from './constants';
 import { getPulseClassification } from './scoring';
-import type { Insight, Meeting, MeetingType, ReasonId, WeekSummary } from './types';
+import { getRecurringSeries } from './series';
+import type { Insight, Meeting, MeetingType, ReasonId, WeekDelta, WeekSummary } from './types';
 
 function average(values: number[]) {
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
@@ -126,6 +127,78 @@ export function generateInsights(meetings: Meeting[]): Insight[] {
     });
   }
 
+  const byDay = meetings.reduce<Map<string, Meeting[]>>((groups, meeting) => {
+    const key = format(new Date(meeting.occurredAt), 'yyyy-MM-dd');
+    groups.set(key, [...(groups.get(key) ?? []), meeting]);
+    return groups;
+  }, new Map());
+  const heavyDay = [...byDay.values()].find((dayMeetings) => {
+    const pulse = dayMeetings.reduce((sum, meeting) => sum + meeting.impactScore, 0);
+    return dayMeetings.length >= 4 && pulse < 0;
+  });
+  if (heavyDay) {
+    insights.push({
+      id: 'heavy-day',
+      eyebrow: 'Load cost',
+      title: 'A packed day pulled the week down',
+      body: 'Protect one recovery block after dense days, and decline the meeting that does not need you live.',
+      tone: 'negative',
+    });
+  }
+
+  const largeRooms = meetings.filter((meeting) => meeting.peopleCount >= 6);
+  if (largeRooms.length >= 3 && average(largeRooms.map((meeting) => meeting.impactScore)) <= -1) {
+    insights.push({
+      id: 'large-rooms',
+      eyebrow: 'Room size',
+      title: 'Larger rooms are landing as a cost',
+      body: 'Invite only the people needed to decide, then share the outcome with everyone else.',
+      tone: 'negative',
+    });
+  }
+
+  const afternoon = meetings.filter((meeting) => new Date(meeting.occurredAt).getHours() >= 15);
+  const earlier = meetings.filter((meeting) => new Date(meeting.occurredAt).getHours() < 15);
+  if (
+    afternoon.length >= 3 &&
+    earlier.length >= 2 &&
+    average(afternoon.map((meeting) => meeting.impactScore)) < average(earlier.map((meeting) => meeting.impactScore)) - 1 &&
+    average(afternoon.map((meeting) => meeting.impactScore)) < 0
+  ) {
+    insights.push({
+      id: 'afternoon-drain',
+      eyebrow: 'Timing',
+      title: 'Later meetings are draining more',
+      body: 'Move decisions earlier when you can, and keep late sessions short with a written outcome.',
+      tone: 'negative',
+    });
+  }
+
+  const costlySeries = getRecurringSeries(meetings).find((series) => series.average <= -2);
+  if (costlySeries) {
+    insights.push({
+      id: 'recurring-cost',
+      eyebrow: 'Repeating format',
+      title: `${MEETING_TYPE_LABELS[costlySeries.meetingType]}s keep coming back as a cost`,
+      body: 'Reset the recurring agenda, expected outcome, and invite list before the next one.',
+      tone: 'negative',
+    });
+  }
+
+  const asyncSeries = getRecurringSeries(
+    meetings.filter((meeting) => meeting.reasonIds.includes('could-have-been-async') || meeting.reasonIds.includes('no-decision')),
+    3,
+  )[0];
+  if (asyncSeries) {
+    insights.push({
+      id: 'recurring-async',
+      eyebrow: 'Repeated friction',
+      title: 'The same format keeps ending without a decision',
+      body: 'Write the desired outcome at the top, or move the update to an async note.',
+      tone: 'negative',
+    });
+  }
+
   return insights.slice(0, 3).length
     ? insights.slice(0, 3)
     : [
@@ -174,5 +247,14 @@ export function summarizeWeek(meetings: Meeting[], start: Date, end: Date): Week
       ) / 10,
     })),
     insights: generateInsights(weekMeetings),
+  };
+}
+
+export function weekOverWeekDelta(current: WeekSummary, previous: WeekSummary | null): WeekDelta | null {
+  if (!previous || previous.meetingCount === 0) return null;
+  return {
+    previousPulse: previous.weeklyPulse,
+    delta: Math.round((current.weeklyPulse - previous.weeklyPulse) * 10) / 10,
+    previousClassification: previous.classification,
   };
 }

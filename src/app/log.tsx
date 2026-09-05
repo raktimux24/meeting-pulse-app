@@ -3,32 +3,24 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { format, isSameDay } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Minus, Plus, RotateCcw } from 'lucide-react-native';
+import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, Minus, Plus, RotateCcw } from 'lucide-react-native';
 import { Controller, useForm, useWatch } from 'react-hook-form';
-import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
-import { z } from 'zod';
+import { useEffect, useMemo, useState } from 'react';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
-import { AppText, Button, Pill, Screen } from '@/components/ui';
+import { AppText, Button, LoadingState, NotFoundState, Pill, Screen, formatSigned } from '@/components/ui';
 import { MEETING_TYPE_LABELS, MOOD_CONFIG, REASONS } from '@/domain/constants';
+import { defaultPeopleCount, lastPeopleByType, lastUsedDefaults, recentTitles } from '@/domain/defaults';
 import { mergeDateTimePart, type DateTimePart } from '@/domain/date-time';
-import { MEETING_TYPES, MOODS, type Mood, type ReasonId } from '@/domain/types';
+import { calculateImpactScore, getImpactLabel } from '@/domain/scoring';
+import { MEETING_TYPES, MOODS, type Meeting, type Mood, type ReasonId } from '@/domain/types';
+import { meetingDetailsSchema, type MeetingDetailsInput } from '@/domain/validation';
 import { useAppData } from '@/providers/app-data-provider';
 import { colors, fonts, radius, spacing } from '@/theme/tokens';
 
-const detailsSchema = z.object({
-  title: z.string().trim().min(1, 'Give the meeting a short name').max(80, 'Keep the name under 80 characters'),
-  durationMinutes: z.number().int().min(1, 'Duration must be at least 1 minute').max(720, 'Duration must be under 12 hours'),
-  meetingType: z.enum(MEETING_TYPES),
-  peopleCount: z.number().int().min(1).max(999),
-  note: z.string().max(500, 'Keep notes under 500 characters'),
-});
-
-type DetailsForm = z.infer<typeof detailsSchema>;
-
 export default function LogMeetingScreen() {
-  const { id } = useLocalSearchParams<{ id?: string }>();
-  const { create, update, getById } = useAppData();
+  const { id, from } = useLocalSearchParams<{ id?: string; from?: string }>();
+  const { create, update, getById, getAll } = useAppData();
   const [step, setStep] = useState<1 | 2>(1);
   const [occurredAt, setOccurredAt] = useState(new Date());
   const [showPicker, setShowPicker] = useState<'date' | 'time' | null>(null);
@@ -36,20 +28,40 @@ export default function LogMeetingScreen() {
   const [reasonIds, setReasonIds] = useState<ReasonId[]>([]);
   const [saving, setSaving] = useState(false);
   const [loadingEdit, setLoadingEdit] = useState(Boolean(id));
+  const [missing, setMissing] = useState(false);
+  const [showWhen, setShowWhen] = useState(false);
+  const [showNote, setShowNote] = useState(false);
+  const [history, setHistory] = useState<Meeting[]>([]);
 
-  const { control, handleSubmit, reset, setValue, trigger, formState: { errors } } = useForm<DetailsForm>({
-    resolver: zodResolver(detailsSchema),
+  const { control, handleSubmit, reset, setValue, trigger, formState: { errors } } = useForm<MeetingDetailsInput>({
+    resolver: zodResolver(meetingDetailsSchema),
     defaultValues: { title: '', durationMinutes: 30, meetingType: 'standup', peopleCount: 2, note: '' },
   });
 
   useEffect(() => {
+    getAll().then((meetings) => {
+      setHistory(meetings);
+      if (id) return;
+      const last = lastUsedDefaults(meetings);
+      if (!last) return;
+      setValue('meetingType', last.meetingType);
+      setValue('durationMinutes', last.durationMinutes);
+      setValue('peopleCount', defaultPeopleCount(last.meetingType, lastPeopleByType(meetings)));
+    });
+  }, [getAll, id, setValue]);
+
+  useEffect(() => {
     if (!id) return;
     getById(id).then((meeting) => {
-      if (!meeting) return;
+      if (!meeting) {
+        setMissing(true);
+        return;
+      }
       reset({ title: meeting.title, durationMinutes: meeting.durationMinutes, meetingType: meeting.meetingType, peopleCount: meeting.peopleCount, note: meeting.note });
       setOccurredAt(new Date(meeting.occurredAt));
       setMood(meeting.mood);
       setReasonIds(meeting.reasonIds);
+      setShowNote(Boolean(meeting.note));
     }).finally(() => setLoadingEdit(false));
   }, [getById, id, reset]);
 
@@ -58,6 +70,8 @@ export default function LogMeetingScreen() {
   const meetingType = useWatch({ control, name: 'meetingType' });
   const pickerMaximum = new Date();
   const maximumTime = isSameDay(occurredAt, pickerMaximum) ? pickerMaximum : undefined;
+  const titles = useMemo(() => recentTitles(history), [history]);
+  const previewScore = mood ? calculateImpactScore(mood, duration, reasonIds) : null;
 
   const next = async () => {
     if (await trigger()) setStep(2);
@@ -67,6 +81,11 @@ export default function LogMeetingScreen() {
     setReasonIds((current) => current.includes(reasonId) ? current.filter((item) => item !== reasonId) : [...current, reasonId]);
   };
 
+  const handleTypeChange = (type: (typeof MEETING_TYPES)[number]) => {
+    setValue('meetingType', type);
+    setValue('peopleCount', defaultPeopleCount(type, lastPeopleByType(history)));
+  };
+
   const save = handleSubmit(async (details) => {
     if (!mood || saving) return;
     setSaving(true);
@@ -74,7 +93,13 @@ export default function LogMeetingScreen() {
       const input = { ...details, occurredAt: occurredAt.toISOString(), mood, reasonIds };
       const meeting = id ? await update(id, input) : await create(input);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      if (meeting) router.replace({ pathname: '/result', params: { id: meeting.id, edited: id ? 'true' : 'false' } });
+      if (!meeting) {
+        Alert.alert('Could not save', 'That reflection is no longer on this device.');
+        return;
+      }
+      router.replace({ pathname: '/result', params: { id: meeting.id, edited: id ? 'true' : 'false', from: from ?? 'today' } });
+    } catch {
+      Alert.alert('Could not save', 'Your reflection was not stored. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -86,12 +111,18 @@ export default function LogMeetingScreen() {
     setOccurredAt((current) => mergeDateTimePart(current, selected, part));
   };
 
-  const useCurrentTime = () => {
-    setShowPicker(null);
-    setOccurredAt(new Date());
-  };
-
-  if (loadingEdit) return <Screen topSafe={false}><AppText>Loading meeting…</AppText></Screen>;
+  if (loadingEdit) return <Screen topSafe={false}><LoadingState label="Loading meeting…" /></Screen>;
+  if (missing) {
+    return (
+      <Screen topSafe={false}>
+        <NotFoundState
+          title="This meeting is gone"
+          body="It may have been deleted. Your other reflections are still on this device."
+          action={<Button label="Back to Today" variant="secondary" onPress={() => router.replace('/(tabs)/today')} />}
+        />
+      </Screen>
+    );
+  }
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={80}>
@@ -110,6 +141,13 @@ export default function LogMeetingScreen() {
               <Controller control={control} name="title" render={({ field: { value, onChange, onBlur } }) => (
                 <TextInput value={value} onChangeText={onChange} onBlur={onBlur} placeholder="e.g. Design review" placeholderTextColor={colors.lineDark} style={styles.input} autoFocus={!id} returnKeyType="done" />
               )} />
+              {titles.length ? (
+                <View style={styles.pills}>
+                  {titles.map((title) => (
+                    <Pill key={title} label={title} onPress={() => setValue('title', title, { shouldValidate: true })} />
+                  ))}
+                </View>
+              ) : null}
             </Field>
 
             <Field label="Duration" error={errors.durationMinutes?.message}>
@@ -122,7 +160,7 @@ export default function LogMeetingScreen() {
             </Field>
 
             <Field label="Meeting type">
-              <View style={styles.pills}>{MEETING_TYPES.map((type) => <Pill key={type} label={MEETING_TYPE_LABELS[type]} selected={meetingType === type} onPress={() => setValue('meetingType', type)} />)}</View>
+              <View style={styles.pills}>{MEETING_TYPES.map((type) => <Pill key={type} label={MEETING_TYPE_LABELS[type]} selected={meetingType === type} onPress={() => handleTypeChange(type)} />)}</View>
             </Field>
 
             <Field label="People in the room">
@@ -133,7 +171,14 @@ export default function LogMeetingScreen() {
               </View>
             </Field>
 
-            <Field label="When it happened">
+            <Pressable accessibilityRole="button" accessibilityState={{ expanded: showWhen }} onPress={() => setShowWhen((value) => !value)} style={styles.disclosure}>
+              <AppText variant="title">When it happened</AppText>
+              <View style={styles.disclosureMeta}>
+                <AppText variant="small" style={{ color: colors.inkSoft }}>{format(occurredAt, "MMM d, h:mm a")}</AppText>
+                <ChevronDown size={18} color={colors.inkSoft} style={{ transform: [{ rotate: showWhen ? '180deg' : '0deg' }] }} />
+              </View>
+            </Pressable>
+            {showWhen ? (
               <View style={styles.whenCard}>
                 <View style={styles.whenHeader}>
                   <View style={styles.whenIcon}><CalendarDays size={20} color={colors.orange} /></View>
@@ -141,12 +186,11 @@ export default function LogMeetingScreen() {
                     <AppText variant="title">Meeting start</AppText>
                     <AppText variant="small" style={{ color: colors.inkSoft }}>Defaults to now. Choose any earlier date and time.</AppText>
                   </View>
-                  <Pressable accessibilityRole="button" accessibilityLabel="Use current date and time" onPress={useCurrentTime} style={({ pressed }) => [styles.nowButton, pressed && styles.pressed]}>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Use current date and time" onPress={() => { setShowPicker(null); setOccurredAt(new Date()); }} style={({ pressed }) => [styles.nowButton, pressed && styles.pressed]}>
                     <RotateCcw size={14} color={colors.orange} />
                     <AppText variant="small" style={styles.nowButtonText}>Now</AppText>
                   </Pressable>
                 </View>
-
                 {Platform.OS === 'ios' ? (
                   <View style={styles.pickerRows}>
                     <View style={styles.nativePickerRow}>
@@ -173,24 +217,34 @@ export default function LogMeetingScreen() {
                     {showPicker ? <DateTimePicker value={occurredAt} mode={showPicker} maximumDate={showPicker === 'date' ? pickerMaximum : maximumTime} onChange={onDateChange(showPicker)} display="default" /> : null}
                   </>
                 )}
-
-                <View style={styles.whenSummary}>
-                  <Clock3 size={14} color={colors.moss} />
-                  <AppText variant="small" style={{ color: colors.inkSoft }}>Saved as {format(occurredAt, "EEEE, MMM d 'at' h:mm a")}</AppText>
-                </View>
               </View>
-            </Field>
+            ) : null}
 
-            <Field label="Private note · optional" error={errors.note?.message}>
-              <Controller control={control} name="note" render={({ field: { value, onChange, onBlur } }) => (
-                <TextInput value={value} onChangeText={onChange} onBlur={onBlur} placeholder="Anything you want to remember…" placeholderTextColor={colors.lineDark} style={[styles.input, styles.note]} multiline textAlignVertical="top" />
-              )} />
-            </Field>
+            <Pressable accessibilityRole="button" accessibilityState={{ expanded: showNote }} onPress={() => setShowNote((value) => !value)} style={styles.disclosure}>
+              <AppText variant="title">Private note · optional</AppText>
+              <ChevronDown size={18} color={colors.inkSoft} style={{ transform: [{ rotate: showNote ? '180deg' : '0deg' }] }} />
+            </Pressable>
+            {showNote ? (
+              <Field label="" error={errors.note?.message}>
+                <Controller control={control} name="note" render={({ field: { value, onChange, onBlur } }) => (
+                  <TextInput value={value} onChangeText={onChange} onBlur={onBlur} placeholder="Anything you want to remember…" placeholderTextColor={colors.lineDark} style={[styles.input, styles.note]} multiline textAlignVertical="top" />
+                )} />
+              </Field>
+            ) : null}
 
             <Button label="Continue to mood check" onPress={next} icon={<ChevronRight size={19} color={colors.white} />} />
           </View>
         ) : (
           <View style={styles.form}>
+            {previewScore != null ? (
+              <View style={styles.preview} accessibilityLiveRegion="polite">
+                <AppText variant="label" style={{ color: colors.orange }}>This will land as</AppText>
+                <AppText variant="title">{formatSigned(previewScore)} · {getImpactLabel(previewScore)}</AppText>
+              </View>
+            ) : (
+              <AppText style={{ color: colors.inkSoft }}>Choose a mood to unlock Save and see the live impact.</AppText>
+            )}
+
             <View style={styles.question}>
               <AppText variant="title">How did this meeting leave you feeling?</AppText>
               <AppText style={{ color: colors.inkSoft }}>Choose the strongest signal you noticed afterward.</AppText>
@@ -199,7 +253,17 @@ export default function LogMeetingScreen() {
                   const config = MOOD_CONFIG[item];
                   const selected = mood === item;
                   return (
-                    <Pressable key={item} accessibilityRole="button" accessibilityState={{ selected }} onPress={() => setMood(item)} style={[styles.moodCard, config.score > 0 ? styles.moodPositive : config.score < 0 ? styles.moodNegative : styles.moodNeutral, selected && styles.moodSelected]}>
+                    <Pressable
+                      key={item}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      accessibilityLabel={`${config.label}, ${config.score > 0 ? `plus ${config.score}` : config.score}${selected ? ', selected' : ''}`}
+                      onPress={() => {
+                        setMood(item);
+                        void Haptics.selectionAsync();
+                      }}
+                      style={[styles.moodCard, config.score > 0 ? styles.moodPositive : config.score < 0 ? styles.moodNegative : styles.moodNeutral, selected && styles.moodSelected]}
+                    >
                       <AppText variant="label" style={{ color: selected ? colors.orange : config.score > 0 ? colors.moss : config.score < 0 ? colors.wine : colors.amber }}>{config.score > 0 ? `+${config.score}` : config.score}</AppText>
                       <AppText variant="title" style={{ color: selected ? colors.white : colors.ink }}>{config.label}</AppText>
                       {selected ? <Check size={17} color={colors.orange} /> : null}
@@ -224,7 +288,7 @@ export default function LogMeetingScreen() {
 }
 
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
-  return <View style={styles.field}><AppText variant="label" style={{ color: colors.inkSoft }}>{label}</AppText>{children}{error ? <AppText variant="small" style={{ color: colors.wine }}>{error}</AppText> : null}</View>;
+  return <View style={styles.field}>{label ? <AppText variant="label" style={{ color: colors.inkSoft }}>{label}</AppText> : null}{children}{error ? <AppText variant="small" style={{ color: colors.wine }}>{error}</AppText> : null}</View>;
 }
 
 function ReasonGroup({ title, reasonIds, sentiment, onToggle }: { title: string; reasonIds: ReasonId[]; sentiment: 'positive' | 'negative'; onToggle: (id: ReasonId) => void }) {
@@ -249,6 +313,8 @@ const styles = StyleSheet.create({
   counter: { minHeight: 62, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: colors.lineDark, borderRadius: radius.md, backgroundColor: colors.surfaceGlass, paddingHorizontal: 8 },
   counterButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' },
   counterValue: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  disclosure: { minHeight: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+  disclosureMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   whenCard: { gap: spacing.md, borderWidth: 1, borderColor: colors.lineDark, borderRadius: radius.md, backgroundColor: colors.surfaceGlass, padding: spacing.md },
   whenHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   whenIcon: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.orangeSoft },
@@ -260,8 +326,8 @@ const styles = StyleSheet.create({
   pickerLabel: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   dateRow: { flexDirection: 'row', gap: 8 },
   dateButton: { flex: 1, minHeight: 64, paddingHorizontal: 12, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: 'rgba(7,10,18,0.42)', flexDirection: 'row', alignItems: 'center', gap: 10 },
-  whenSummary: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   pressed: { opacity: 0.76, transform: [{ scale: 0.98 }] },
+  preview: { gap: 4, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.lineDark, backgroundColor: colors.surfaceGlass },
   question: { gap: spacing.md },
   moodGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   moodCard: { width: '48%', minHeight: 104, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surfaceGlass, padding: spacing.md, gap: 5, justifyContent: 'space-between', shadowColor: colors.shadow, shadowOpacity: 0.18, shadowRadius: 12 },

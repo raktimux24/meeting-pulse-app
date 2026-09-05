@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText, formatSigned } from './ui';
 import { MEETING_TYPE_LABELS, MOOD_CONFIG, REASON_MAP } from '@/domain/constants';
+import { getImpactLabel } from '@/domain/scoring';
 import type { Meeting } from '@/domain/types';
 import { colors, fonts, radius, spacing } from '@/theme/tokens';
 
@@ -17,7 +18,7 @@ export function MeetingCard({ meeting, onPress }: { meeting: Meeting; onPress: (
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${meeting.title}, ${MOOD_CONFIG[meeting.mood].label}, ${meeting.impactScore >= 0 ? 'positive' : 'negative'} ${Math.abs(meeting.impactScore)} impact`}
+      accessibilityLabel={`${meeting.title}, ${MOOD_CONFIG[meeting.mood].label}, ${getImpactLabel(meeting.impactScore)}, ${meeting.impactScore >= 0 ? 'positive' : 'negative'} ${Math.abs(meeting.impactScore)} impact`}
       onPress={onPress}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >
@@ -31,6 +32,7 @@ export function MeetingCard({ meeting, onPress }: { meeting: Meeting; onPress: (
           </View>
           <View style={[styles.score, { backgroundColor: background, borderColor: accent }]}> 
             <AppText variant="title" style={{ color: accent, fontFamily: fonts.bodyBold }}>{formatSigned(meeting.impactScore)}</AppText>
+            <AppText variant="small" style={{ color: accent }}>{getImpactLabel(meeting.impactScore)}</AppText>
           </View>
         </View>
         <View style={styles.metaRow}>
@@ -48,7 +50,7 @@ const styles = StyleSheet.create({
   rail: { width: 5 },
   content: { flex: 1, padding: spacing.md, gap: spacing.md },
   topRow: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
-  score: { minWidth: 58, height: 46, borderRadius: 23, borderWidth: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 11, shadowColor: colors.shadow, shadowOpacity: 0.25, shadowRadius: 10 },
+  score: { minWidth: 72, minHeight: 52, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, paddingVertical: 6, shadowColor: colors.shadow, shadowOpacity: 0.25, shadowRadius: 10 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   metaText: { color: colors.inkSoft },

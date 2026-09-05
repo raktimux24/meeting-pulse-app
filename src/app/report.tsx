@@ -5,11 +5,12 @@ import { useLocalSearchParams } from 'expo-router';
 import { Share2, ShieldCheck } from 'lucide-react-native';
 import { captureRef } from 'react-native-view-shot';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, Share, StyleSheet, View } from 'react-native';
 
 import { AppText, Button, formatSigned, Screen } from '@/components/ui';
 import { MEETING_TYPE_LABELS, REASON_MAP } from '@/domain/constants';
 import { summarizeWeek } from '@/domain/insights';
+import { buildReportShareText } from '@/domain/report-text';
 import type { Meeting } from '@/domain/types';
 import { useAppData } from '@/providers/app-data-provider';
 import { colors, fonts, gradients, radius, spacing } from '@/theme/tokens';
@@ -85,6 +86,14 @@ export default function ReportScreen() {
       </View>
 
       <Button label="Share report as image" onPress={share} loading={sharing} disabled={!loaded} icon={<Share2 size={19} color={colors.white} />} />
+      <Button
+        label="Share as text"
+        variant="secondary"
+        disabled={!loaded}
+        onPress={() => {
+          void Share.share({ message: buildReportShareText(summary, start, end) });
+        }}
+      />
     </Screen>
   );
 }

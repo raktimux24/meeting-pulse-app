@@ -4,25 +4,46 @@ import { Edit3, Trash2 } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
-import { AppText, Button, Card, formatSigned, GradientCard, Pill, Screen } from '@/components/ui';
+import { AppText, Button, Card, LoadingState, NotFoundState, formatSigned, GradientCard, Pill, Screen } from '@/components/ui';
 import { MEETING_TYPE_LABELS, MOOD_CONFIG, REASON_MAP } from '@/domain/constants';
+import { originPath } from '@/domain/format';
 import { getImpactLabel, getMeetingSuggestion } from '@/domain/scoring';
 import type { Meeting } from '@/domain/types';
 import { useAppData } from '@/providers/app-data-provider';
 import { colors, gradients, spacing } from '@/theme/tokens';
 
 export default function MeetingDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
   const { getById, remove, revision } = useAppData();
   const [meeting, setMeeting] = useState<Meeting | null>(null);
-  useEffect(() => { if (id) getById(id).then(setMeeting); }, [getById, id, revision]);
+  const [missing, setMissing] = useState(!id);
 
-  if (!meeting) return <Screen topSafe={false}><AppText>Loading meeting…</AppText></Screen>;
+  useEffect(() => {
+    if (!id) return;
+    getById(id).then((found) => {
+      if (!found) setMissing(true);
+      else setMeeting(found);
+    });
+  }, [getById, id, revision]);
+
+  if (missing) {
+    return (
+      <Screen topSafe={false}>
+        <NotFoundState
+          title="Meeting not found"
+          body="This reflection is no longer on this device."
+          action={<Button label="Go back" variant="secondary" onPress={() => router.replace(originPath(from))} />}
+        />
+      </Screen>
+    );
+  }
+
+  if (!meeting) return <Screen topSafe={false}><LoadingState label="Loading meeting…" /></Screen>;
   const tone = meeting.impactScore > 0 ? colors.moss : meeting.impactScore < 0 ? colors.wine : colors.amber;
 
-  const confirmDelete = () => Alert.alert('Delete this meeting?', 'This reflection will be permanently removed.', [
+  const confirmDelete = () => Alert.alert('Delete this meeting?', 'This reflection will be permanently removed. You can undo for a few seconds.', [
     { text: 'Cancel', style: 'cancel' },
-    { text: 'Delete', style: 'destructive', onPress: async () => { await remove(meeting.id); router.back(); } },
+    { text: 'Delete', style: 'destructive', onPress: async () => { await remove(meeting.id); router.replace(originPath(from)); } },
   ]);
 
   return (
@@ -59,7 +80,7 @@ export default function MeetingDetailScreen() {
       <Card style={styles.section}><AppText variant="label" style={{ color: tone }}>One thing to try</AppText><AppText variant="title">{getMeetingSuggestion(meeting)}</AppText></Card>
 
       <View style={styles.actions}>
-        <Button label="Edit reflection" variant="secondary" onPress={() => router.push({ pathname: '/log', params: { id: meeting.id } })} icon={<Edit3 size={18} color={colors.ink} />} />
+        <Button label="Edit reflection" variant="secondary" onPress={() => router.push({ pathname: '/log', params: { id: meeting.id, from: from ?? 'today' } })} icon={<Edit3 size={18} color={colors.ink} />} />
         <Button label="Delete meeting" variant="danger" onPress={confirmDelete} icon={<Trash2 size={18} color={colors.wine} />} />
       </View>
     </Screen>
