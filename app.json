@@ -13,6 +13,9 @@
       "supportsTablet": false,
       "config": {
         "usesNonExemptEncryption": false
+      },
+      "entitlements": {
+        "aps-environment": "production"
       }
     },
     "android": {
@@ -51,7 +54,8 @@
         "expo-notifications",
         {
           "color": "#FF7958",
-          "defaultChannel": "meeting-pulse-daily"
+          "defaultChannel": "meeting-pulse-daily",
+          "mode": "production"
         }
       ]
     ],
