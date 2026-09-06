@@ -54,8 +54,8 @@ export default function TodayScreen() {
             </AppText>
           </View>
           <View style={styles.pulseStage}>
-            <View pointerEvents="none" style={styles.orbitOne} />
-            <View pointerEvents="none" style={styles.orbitTwo} />
+            <View pointerEvents="none" style={[styles.orbit, styles.orbitOuter]} />
+            <View pointerEvents="none" style={[styles.orbit, styles.orbitMid]} />
             <PulseDisc pulse={pulse} />
           </View>
         </View>
@@ -117,8 +117,18 @@ const styles = StyleSheet.create({
   pulseCard: { gap: 16, overflow: 'hidden', paddingVertical: 20 },
   pulseTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
   pulseCopy: { flex: 1, gap: 6, paddingRight: spacing.md },
-  pulseStage: { width: 88, height: 88, alignItems: 'center', justifyContent: 'center' },
+  pulseStage: { width: 88, height: 88, position: 'relative' },
+  orbit: {
+    position: 'absolute',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+  orbitOuter: { top: 0, left: 0, width: 88, height: 88, borderRadius: 44 },
+  orbitMid: { top: 8, left: 8, width: 72, height: 72, borderRadius: 36, borderColor: 'rgba(255,255,255,0.18)' },
   pulseDisc: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
     width: 56,
     height: 56,
     borderRadius: 28,
@@ -127,7 +137,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    position: 'relative',
     shadowColor: colors.orange,
     shadowOpacity: 0.28,
     shadowRadius: 18,
@@ -160,6 +169,4 @@ const styles = StyleSheet.create({
   list: { gap: spacing.md },
   intentionCard: { gap: spacing.md },
   heroGlow: { position: 'absolute', width: 160, height: 160, borderRadius: 80, backgroundColor: colors.orange, opacity: 0.12, right: -28, top: -70, shadowColor: colors.orange, shadowOpacity: 0.9, shadowRadius: 70 },
-  orbitOne: { position: 'absolute', width: 88, height: 88, borderRadius: 44, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.12)' },
-  orbitTwo: { position: 'absolute', width: 72, height: 72, borderRadius: 36, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.16)' },
 });
