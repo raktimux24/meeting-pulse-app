@@ -3,12 +3,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText, formatSigned } from './ui';
-import { MEETING_TYPE_LABELS, MOOD_CONFIG, REASON_MAP } from '@/domain/constants';
+import { MOOD_CONFIG, REASON_MAP } from '@/domain/constants';
+import { meetingTypeLabel } from '@/domain/meeting-types';
 import { getImpactLabel } from '@/domain/scoring';
 import type { Meeting } from '@/domain/types';
+import { useAppData } from '@/providers/app-data-provider';
 import { colors, fonts, radius, spacing } from '@/theme/tokens';
 
 export function MeetingCard({ meeting, onPress }: { meeting: Meeting; onPress: () => void }) {
+  const { customMeetingTypes } = useAppData();
   const positive = meeting.impactScore > 0;
   const neutral = meeting.impactScore === 0;
   const accent = positive ? colors.moss : neutral ? colors.amber : colors.wine;
@@ -28,7 +31,7 @@ export function MeetingCard({ meeting, onPress }: { meeting: Meeting; onPress: (
         <View style={styles.topRow}>
           <View style={{ flex: 1, gap: 3 }}>
             <AppText variant="title" numberOfLines={1}>{meeting.title}</AppText>
-            <AppText variant="small" style={{ color: colors.inkSoft }}>{MEETING_TYPE_LABELS[meeting.meetingType]} · {MOOD_CONFIG[meeting.mood].label}</AppText>
+            <AppText variant="small" style={{ color: colors.inkSoft }}>{meetingTypeLabel(meeting.meetingType, customMeetingTypes)} · {MOOD_CONFIG[meeting.mood].label}</AppText>
           </View>
           <View style={[styles.score, { backgroundColor: background, borderColor: accent }]}> 
             <AppText variant="title" style={{ color: accent, fontFamily: fonts.bodyBold }}>{formatSigned(meeting.impactScore)}</AppText>
@@ -46,9 +49,9 @@ export function MeetingCard({ meeting, onPress }: { meeting: Meeting; onPress: (
 }
 
 const styles = StyleSheet.create({
-  card: { minHeight: 132, flexDirection: 'row', borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface, overflow: 'hidden', shadowColor: colors.shadow, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.24, shadowRadius: 18, elevation: 5 },
-  rail: { width: 5 },
-  content: { flex: 1, padding: spacing.md, gap: spacing.md },
+  card: { minHeight: 118, flexDirection: 'row', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', borderRadius: radius.md, backgroundColor: colors.surface, overflow: 'hidden', shadowColor: colors.shadow, shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.26, shadowRadius: 18, elevation: 5 },
+  rail: { width: 3 },
+  content: { flex: 1, paddingVertical: spacing.md, paddingHorizontal: spacing.md, gap: 12 },
   topRow: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
   score: { minWidth: 72, minHeight: 52, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, paddingVertical: 6, shadowColor: colors.shadow, shadowOpacity: 0.25, shadowRadius: 10 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },

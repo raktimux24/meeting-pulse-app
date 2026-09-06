@@ -1,13 +1,14 @@
 import { format } from 'date-fns';
 
-import { MEETING_TYPE_LABELS, REASON_MAP } from './constants';
+import { REASON_MAP } from './constants';
 import { formatSigned } from './format';
+import { meetingTypeLabel } from './meeting-types';
 import type { WeekSummary } from './types';
 
 export function buildReportShareText(summary: WeekSummary, start: Date, end: Date): string {
   const recommendation = summary.insights[0]?.body ?? 'Keep logging to reveal a pattern worth changing.';
-  const useful = summary.mostUsefulType ? MEETING_TYPE_LABELS[summary.mostUsefulType] : 'No clear leader';
-  const draining = summary.mostDrainingType ? MEETING_TYPE_LABELS[summary.mostDrainingType] : 'No clear drag';
+  const useful = summary.mostUsefulType ? meetingTypeLabel(summary.mostUsefulType) : 'No clear leader';
+  const draining = summary.mostDrainingType ? meetingTypeLabel(summary.mostDrainingType) : 'No clear drag';
   const issue = summary.topNegativeReason ? REASON_MAP[summary.topNegativeReason].label : 'None repeated';
 
   return [

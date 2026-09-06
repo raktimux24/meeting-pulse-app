@@ -5,7 +5,8 @@ import { useEffect, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
 import { AppText, Button, Card, LoadingState, NotFoundState, formatSigned, GradientCard, Pill, Screen } from '@/components/ui';
-import { MEETING_TYPE_LABELS, MOOD_CONFIG, REASON_MAP } from '@/domain/constants';
+import { MOOD_CONFIG, REASON_MAP } from '@/domain/constants';
+import { meetingTypeLabel } from '@/domain/meeting-types';
 import { originPath } from '@/domain/format';
 import { getImpactLabel, getMeetingSuggestion } from '@/domain/scoring';
 import type { Meeting } from '@/domain/types';
@@ -14,7 +15,7 @@ import { colors, gradients, spacing } from '@/theme/tokens';
 
 export default function MeetingDetailScreen() {
   const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
-  const { getById, remove, revision } = useAppData();
+  const { getById, remove, revision, customMeetingTypes } = useAppData();
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [missing, setMissing] = useState(!id);
 
@@ -49,7 +50,7 @@ export default function MeetingDetailScreen() {
   return (
     <Screen topSafe={false}>
       <View style={styles.titleBlock}>
-        <AppText variant="label" style={{ color: colors.orange }}>{MEETING_TYPE_LABELS[meeting.meetingType]} · {format(new Date(meeting.occurredAt), 'MMM d, h:mm a')}</AppText>
+        <AppText variant="label" style={{ color: colors.orange }}>{meetingTypeLabel(meeting.meetingType, customMeetingTypes)} · {format(new Date(meeting.occurredAt), 'MMM d, h:mm a')}</AppText>
         <AppText variant="hero">{meeting.title}</AppText>
       </View>
 
@@ -67,7 +68,7 @@ export default function MeetingDetailScreen() {
       <Card style={styles.details}>
         <Detail label="Duration" value={`${meeting.durationMinutes} minutes`} />
         <Detail label="People" value={`${meeting.peopleCount}`} />
-        <Detail label="Type" value={MEETING_TYPE_LABELS[meeting.meetingType]} />
+        <Detail label="Type" value={meetingTypeLabel(meeting.meetingType, customMeetingTypes)} />
       </Card>
 
       <View style={styles.section}>

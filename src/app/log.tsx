@@ -9,18 +9,19 @@ import { useEffect, useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { AppText, Button, LoadingState, NotFoundState, Pill, Screen, formatSigned } from '@/components/ui';
-import { MEETING_TYPE_LABELS, MOOD_CONFIG, REASONS } from '@/domain/constants';
+import { MOOD_CONFIG, REASONS } from '@/domain/constants';
+import { catalogMeetingTypes } from '@/domain/meeting-types';
 import { defaultPeopleCount, lastPeopleByType, lastUsedDefaults, recentTitles } from '@/domain/defaults';
 import { mergeDateTimePart, type DateTimePart } from '@/domain/date-time';
 import { calculateImpactScore, getImpactLabel } from '@/domain/scoring';
-import { MEETING_TYPES, MOODS, type Meeting, type Mood, type ReasonId } from '@/domain/types';
+import { MOODS, type Meeting, type MeetingType, type Mood, type ReasonId } from '@/domain/types';
 import { meetingDetailsSchema, type MeetingDetailsInput } from '@/domain/validation';
 import { useAppData } from '@/providers/app-data-provider';
 import { colors, fonts, radius, spacing } from '@/theme/tokens';
 
 export default function LogMeetingScreen() {
   const { id, from } = useLocalSearchParams<{ id?: string; from?: string }>();
-  const { create, update, getById, getAll } = useAppData();
+  const { create, update, getById, getAll, customMeetingTypes } = useAppData();
   const [step, setStep] = useState<1 | 2>(1);
   const [occurredAt, setOccurredAt] = useState(new Date());
   const [showPicker, setShowPicker] = useState<'date' | 'time' | null>(null);
@@ -81,7 +82,9 @@ export default function LogMeetingScreen() {
     setReasonIds((current) => current.includes(reasonId) ? current.filter((item) => item !== reasonId) : [...current, reasonId]);
   };
 
-  const handleTypeChange = (type: (typeof MEETING_TYPES)[number]) => {
+  const typeOptions = useMemo(() => catalogMeetingTypes(customMeetingTypes), [customMeetingTypes]);
+
+  const handleTypeChange = (type: MeetingType) => {
     setValue('meetingType', type);
     setValue('peopleCount', defaultPeopleCount(type, lastPeopleByType(history)));
   };
@@ -160,7 +163,8 @@ export default function LogMeetingScreen() {
             </Field>
 
             <Field label="Meeting type">
-              <View style={styles.pills}>{MEETING_TYPES.map((type) => <Pill key={type} label={MEETING_TYPE_LABELS[type]} selected={meetingType === type} onPress={() => handleTypeChange(type)} />)}</View>
+              <View style={styles.pills}>{typeOptions.map((type) => <Pill key={type.id} label={type.label} selected={meetingType === type.id} onPress={() => handleTypeChange(type.id)} />)}</View>
+              <AppText variant="small" style={{ color: colors.inkSoft }}>Need another format? Add it in Settings.</AppText>
             </Field>
 
             <Field label="People in the room">

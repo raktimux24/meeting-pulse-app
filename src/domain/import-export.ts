@@ -1,9 +1,11 @@
+import { parseCustomMeetingTypes } from './meeting-types';
 import { exportedMeetingSchema, exportPayloadSchema } from './validation';
-import type { MeetingInput } from './types';
+import type { CustomMeetingType, MeetingInput } from './types';
 
 export type ImportPreview = {
   meetings: MeetingInput[];
   weekStartsOn: 0 | 1 | null;
+  customMeetingTypes: CustomMeetingType[];
   imported: number;
   skipped: number;
 };
@@ -43,6 +45,7 @@ export function parseExportPayload(raw: unknown): ImportPreview {
   return {
     meetings,
     weekStartsOn: payload.data.weekStartsOn ?? null,
+    customMeetingTypes: parseCustomMeetingTypes(JSON.stringify(payload.data.customMeetingTypes ?? [])),
     imported: meetings.length,
     skipped,
   };

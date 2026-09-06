@@ -1,6 +1,7 @@
 import { eachDayOfInterval, format, isWithinInterval } from 'date-fns';
 
-import { MEETING_TYPE_LABELS, REASON_MAP } from './constants';
+import { REASON_MAP } from './constants';
+import { meetingTypeLabel } from './meeting-types';
 import { getPulseClassification } from './scoring';
 import { getRecurringSeries } from './series';
 import type { Insight, Meeting, MeetingType, ReasonId, WeekDelta, WeekSummary } from './types';
@@ -10,7 +11,7 @@ function average(values: number[]) {
 }
 
 function typeAverages(meetings: Meeting[]) {
-  return meetings.reduce<Partial<Record<MeetingType, number[]>>>((groups, meeting) => {
+  return meetings.reduce<Record<string, number[]>>((groups, meeting) => {
     groups[meeting.meetingType] = [...(groups[meeting.meetingType] ?? []), meeting.impactScore];
     return groups;
   }, {});
@@ -18,7 +19,7 @@ function typeAverages(meetings: Meeting[]) {
 
 function rankedTypes(meetings: Meeting[]) {
   return Object.entries(typeAverages(meetings))
-    .map(([type, scores]) => ({ type: type as MeetingType, average: average(scores), count: scores.length }))
+    .map(([type, scores]) => ({ type: type as MeetingType, average: average(scores ?? []), count: (scores ?? []).length }))
     .sort((a, b) => b.average - a.average);
 }
 
@@ -104,7 +105,7 @@ export function generateInsights(meetings: Meeting[]): Insight[] {
     insights.push({
       id: `type-${worstType.type}`,
       eyebrow: 'Recurring cost',
-      title: `${MEETING_TYPE_LABELS[worstType.type]}s need a reset`,
+      title: `${meetingTypeLabel(worstType.type)}s need a reset`,
       body: 'Review the recurring format, expected outcome, and attendee list before the next one.',
       tone: 'negative',
     });
@@ -179,7 +180,7 @@ export function generateInsights(meetings: Meeting[]): Insight[] {
     insights.push({
       id: 'recurring-cost',
       eyebrow: 'Repeating format',
-      title: `${MEETING_TYPE_LABELS[costlySeries.meetingType]}s keep coming back as a cost`,
+      title: `${meetingTypeLabel(costlySeries.meetingType)}s keep coming back as a cost`,
       body: 'Reset the recurring agenda, expected outcome, and invite list before the next one.',
       tone: 'negative',
     });

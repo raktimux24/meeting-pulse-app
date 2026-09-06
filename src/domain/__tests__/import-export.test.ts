@@ -55,5 +55,16 @@ describe('export import', () => {
     expect(preview.imported).toBe(1);
     expect(preview.skipped).toBe(2);
     expect(preview.meetings[0]?.title).toBe('Standup');
+    expect(preview.customMeetingTypes).toEqual([]);
+  });
+
+  it('accepts a custom meeting type and imported type catalog', () => {
+    const preview = parseExportPayload({
+      customMeetingTypes: [{ id: 'design-crit', label: 'Design critique' }],
+      meetings: [{ ...validMeeting, meetingType: 'design-crit' }],
+    });
+    expect(preview.imported).toBe(1);
+    expect(preview.meetings[0]?.meetingType).toBe('design-crit');
+    expect(preview.customMeetingTypes).toEqual([{ id: 'design-crit', label: 'Design critique' }]);
   });
 });

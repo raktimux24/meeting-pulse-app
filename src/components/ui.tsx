@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Atmosphere } from '@/components/atmosphere';
 import { formatSigned } from '@/domain/format';
 import { colors, fonts, gradients, radius, spacing } from '@/theme/tokens';
 
@@ -43,12 +44,12 @@ export function AppText({
 }
 
 const textVariants = StyleSheet.create({
-  body: { fontFamily: fonts.body, fontSize: 16, lineHeight: 24 },
-  small: { fontFamily: fonts.body, fontSize: 13, lineHeight: 18 },
-  label: { fontFamily: fonts.bodyBold, fontSize: 11, lineHeight: 15, letterSpacing: 1.35, textTransform: 'uppercase' },
-  title: { fontFamily: fonts.bodyBold, fontSize: 20, lineHeight: 25, letterSpacing: -0.2 },
-  hero: { fontFamily: fonts.display, fontSize: 43, lineHeight: 44, letterSpacing: -1.5 },
-  display: { fontFamily: fonts.display, fontSize: 33, lineHeight: 36, letterSpacing: -0.9 },
+  body: { fontFamily: fonts.body, fontSize: 15, lineHeight: 22 },
+  small: { fontFamily: fonts.body, fontSize: 12, lineHeight: 16 },
+  label: { fontFamily: fonts.bodyBold, fontSize: 10, lineHeight: 13, letterSpacing: 1.5, textTransform: 'uppercase' },
+  title: { fontFamily: fonts.bodyBold, fontSize: 18, lineHeight: 23, letterSpacing: -0.3 },
+  hero: { fontFamily: fonts.display, fontSize: 44, lineHeight: 46, letterSpacing: -1.6 },
+  display: { fontFamily: fonts.display, fontSize: 32, lineHeight: 36, letterSpacing: -0.8 },
 });
 
 export function Screen({
@@ -76,10 +77,7 @@ export function Screen({
   return (
     <SafeAreaView style={styles.safe} edges={topSafe ? ['top'] : []}>
       <StatusBar style="light" />
-      <LinearGradient colors={gradients.screen} locations={[0, 0.52, 1]} style={StyleSheet.absoluteFill} />
-      <View pointerEvents="none" style={[styles.ambientOrb, styles.ambientOrbCoral]} />
-      <View pointerEvents="none" style={[styles.ambientOrb, styles.ambientOrbBlue]} />
-      <View pointerEvents="none" style={styles.gridOverlay} />
+      <Atmosphere />
       {scroll ? (
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {content}
@@ -102,7 +100,7 @@ export function Header({ eyebrow, title, subtitle, onSettings, onLog, action }: 
       <View style={styles.headerCopy}>
         <View style={styles.eyebrowRow}><View style={styles.eyebrowDot} /><AppText variant="label" style={styles.eyebrow}>{eyebrow}</AppText></View>
         <AppText variant="display">{title}</AppText>
-        {subtitle ? <AppText style={styles.muted}>{subtitle}</AppText> : null}
+        {subtitle ? <AppText style={[styles.muted, styles.headerSubtitle]}>{subtitle}</AppText> : null}
       </View>
       {action ?? (
         <View style={styles.headerActions}>
@@ -123,14 +121,24 @@ export function Header({ eyebrow, title, subtitle, onSettings, onLog, action }: 
 }
 
 export function Card({ children, style }: PropsWithChildren<{ style?: StyleProp<ViewStyle> }>) {
-  return <View style={[styles.card, style]}>{children}</View>;
+  return (
+    <View style={[styles.card, style]}>
+      <View pointerEvents="none" style={styles.cardSheen} />
+      {children}
+    </View>
+  );
 }
 
 export function GradientCard({ children, style, colors: gradientColors = gradients.glass }: PropsWithChildren<{
   style?: StyleProp<ViewStyle>;
   colors?: readonly [string, string, ...string[]];
 }>) {
-  return <LinearGradient colors={gradientColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.card, styles.gradientCard, style]}>{children}</LinearGradient>;
+  return (
+    <LinearGradient colors={gradientColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.card, styles.gradientCard, style]}>
+      <View pointerEvents="none" style={styles.cardSheen} />
+      {children}
+    </LinearGradient>
+  );
 }
 
 export function Button({ label, onPress, icon, variant = 'primary', disabled, loading, style }: {
@@ -220,35 +228,33 @@ export function NotFoundState({ title, body, action }: { title: string; body: st
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.paper, overflow: 'hidden' },
   scrollContent: { flexGrow: 1 },
-  screenContent: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.xxl, gap: spacing.lg },
+  screenContent: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.xxl, gap: spacing.lg },
   text: { color: colors.ink },
   muted: { color: colors.inkSoft },
-  eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 7 },
-  eyebrowDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.orange, shadowColor: colors.orange, shadowOpacity: 0.9, shadowRadius: 8 },
-  eyebrow: { color: colors.orange, marginBottom: 6 },
+  eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 2 },
+  eyebrowDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.orange, shadowColor: colors.orange, shadowOpacity: 0.95, shadowRadius: 7 },
+  eyebrow: { color: colors.orange },
   header: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md },
-  headerCopy: { flex: 1, gap: 4 },
-  headerActions: { flexDirection: 'row', gap: 8 },
+  headerCopy: { flex: 1, gap: 6, paddingTop: 2 },
+  headerSubtitle: { maxWidth: 280 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 2 },
   statusBlock: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, paddingVertical: spacing.xxl },
-  iconButton: { width: 48, height: 48, borderRadius: 24, borderWidth: 1, borderColor: colors.lineDark, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceGlass, shadowColor: colors.shadow, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.28, shadowRadius: 16, elevation: 5 },
+  iconButton: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(17,24,39,0.62)', shadowColor: colors.shadow, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.28, shadowRadius: 16, elevation: 5 },
   pressed: { opacity: 0.78, transform: [{ scale: 0.975 }] },
-  card: { borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surfaceGlass, padding: spacing.lg, shadowColor: colors.shadow, shadowOffset: { width: 0, height: 14 }, shadowOpacity: 0.22, shadowRadius: 24, elevation: 6 },
+  card: { borderRadius: radius.lg, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', backgroundColor: colors.surfaceGlass, padding: spacing.lg, overflow: 'hidden', shadowColor: colors.shadow, shadowOffset: { width: 0, height: 16 }, shadowOpacity: 0.28, shadowRadius: 28, elevation: 6 },
+  cardSheen: { position: 'absolute', top: 0, left: 18, right: 18, height: 1, backgroundColor: 'rgba(255,255,255,0.16)' },
   gradientCard: { overflow: 'hidden' },
-  button: { minHeight: 56, borderRadius: radius.round, borderWidth: 1, paddingHorizontal: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
+  button: { minHeight: 52, borderRadius: radius.round, borderWidth: 1, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   buttonText: { fontFamily: fonts.bodyBold },
   buttonTextPrimary: { color: colors.white },
   buttonTextDanger: { color: colors.wine },
   disabled: { opacity: 0.4 },
-  pill: { minHeight: 44, borderRadius: radius.round, borderWidth: 1, borderColor: colors.lineDark, paddingHorizontal: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(23,33,54,0.80)' },
+  pill: { minHeight: 40, borderRadius: radius.round, borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', paddingHorizontal: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(17,24,39,0.72)' },
   pillPositive: { backgroundColor: colors.mossSoft, borderColor: 'rgba(114,230,192,0.30)' },
   pillNegative: { backgroundColor: colors.wineSoft, borderColor: 'rgba(255,113,133,0.30)' },
   pillSelected: { backgroundColor: colors.orange, borderColor: colors.orange },
   sectionTitle: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.md },
   empty: { alignItems: 'center', gap: spacing.md, paddingVertical: spacing.xl },
-  emptyMark: { width: 68, height: 68, borderRadius: 34, borderWidth: 1, borderColor: colors.orange, backgroundColor: colors.orangeSoft, alignItems: 'center', justifyContent: 'center', shadowColor: colors.orange, shadowOpacity: 0.35, shadowRadius: 22 },
-  emptyMarkInner: { width: 13, height: 13, borderRadius: 7, backgroundColor: colors.orange, shadowColor: colors.orange, shadowOpacity: 0.9, shadowRadius: 9 },
-  ambientOrb: { position: 'absolute', borderRadius: 999, opacity: 0.13 },
-  ambientOrbCoral: { width: 290, height: 290, backgroundColor: colors.orange, right: -175, top: -100, shadowColor: colors.orange, shadowOpacity: 0.9, shadowRadius: 90 },
-  ambientOrbBlue: { width: 330, height: 330, backgroundColor: colors.blue, left: -245, top: 310, shadowColor: colors.blue, shadowOpacity: 0.75, shadowRadius: 100 },
-  gridOverlay: { position: 'absolute', width: '140%', height: '120%', left: '-20%', top: '-10%', borderWidth: 1, borderColor: 'rgba(255,255,255,0.018)', transform: [{ rotate: '-8deg' }] },
+  emptyMark: { width: 64, height: 64, borderRadius: 32, borderWidth: 1, borderColor: 'rgba(255,121,88,0.55)', backgroundColor: colors.orangeSoft, alignItems: 'center', justifyContent: 'center', shadowColor: colors.orange, shadowOpacity: 0.4, shadowRadius: 22 },
+  emptyMarkInner: { width: 11, height: 11, borderRadius: 6, backgroundColor: colors.orange, shadowColor: colors.orange, shadowOpacity: 0.95, shadowRadius: 9 },
 });

@@ -6,7 +6,7 @@ import { StyleSheet, TextInput, View } from 'react-native';
 import { MeetingCard } from '@/components/meeting-card';
 import { UndoBar } from '@/components/undo-bar';
 import { AppText, Button, EmptyState, Header, Pill, Screen, formatSigned } from '@/components/ui';
-import { MEETING_TYPE_LABELS } from '@/domain/constants';
+import { meetingTypeLabel } from '@/domain/meeting-types';
 import type { Meeting, MeetingType } from '@/domain/types';
 import { useAppData } from '@/providers/app-data-provider';
 import { colors, fonts, radius, spacing } from '@/theme/tokens';
@@ -14,7 +14,7 @@ import { colors, fonts, radius, spacing } from '@/theme/tokens';
 type SentimentFilter = 'all' | 'positive' | 'neutral' | 'negative';
 
 export default function HistoryScreen() {
-  const { search, revision } = useAppData();
+  const { search, revision, customMeetingTypes } = useAppData();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [query, setQuery] = useState('');
   const [sentiment, setSentiment] = useState<SentimentFilter>('all');
@@ -71,7 +71,7 @@ export default function HistoryScreen() {
         {availableTypes.length ? <AppText variant="label" style={{ color: colors.inkSoft, marginTop: spacing.sm }}>Meeting type</AppText> : null}
         <View style={styles.pills}>
           {availableTypes.length ? <Pill label="All types" selected={type === 'all'} onPress={() => setType('all')} /> : null}
-          {availableTypes.map((item) => <Pill key={item} label={MEETING_TYPE_LABELS[item]} selected={type === item} onPress={() => setType(item)} />)}
+          {availableTypes.map((item) => <Pill key={item} label={meetingTypeLabel(item, customMeetingTypes)} selected={type === item} onPress={() => setType(item)} />)}
         </View>
         {filtersActive ? <Button label="Reset filters" variant="ghost" onPress={resetFilters} /> : null}
       </View>

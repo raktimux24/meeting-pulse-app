@@ -8,7 +8,8 @@ import { MeetingCard } from '@/components/meeting-card';
 import { UndoBar } from '@/components/undo-bar';
 import { WeekChart } from '@/components/week-chart';
 import { AppText, Button, Card, EmptyState, formatSigned, GradientCard, Header, Screen, SectionTitle } from '@/components/ui';
-import { MEETING_TYPE_LABELS, REASON_MAP } from '@/domain/constants';
+import { REASON_MAP } from '@/domain/constants';
+import { meetingTypeLabel } from '@/domain/meeting-types';
 import { summarizeWeek, weekOverWeekDelta } from '@/domain/insights';
 import { getRecurringSeries } from '@/domain/series';
 import type { Meeting } from '@/domain/types';
@@ -21,7 +22,7 @@ export default function InsightsScreen() {
   const [previousMeetings, setPreviousMeetings] = useState<Meeting[]>([]);
   const [seriesMeetings, setSeriesMeetings] = useState<Meeting[]>([]);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
-  const { getRange, revision, weekStartsOn, saveIntention } = useAppData();
+  const { getRange, revision, weekStartsOn, saveIntention, customMeetingTypes } = useAppData();
   const start = useMemo(() => startOfWeek(weekAnchor, { weekStartsOn }), [weekAnchor, weekStartsOn]);
   const end = useMemo(() => endOfWeek(weekAnchor, { weekStartsOn }), [weekAnchor, weekStartsOn]);
   const previousStart = useMemo(() => startOfWeek(subWeeks(start, 1), { weekStartsOn }), [start, weekStartsOn]);
@@ -123,7 +124,7 @@ export default function InsightsScreen() {
               {series.map((item) => (
                 <Card key={item.key} style={styles.seriesCard}>
                   <View style={{ flex: 1, gap: 4 }}>
-                    <AppText variant="label" style={{ color: item.average < 0 ? colors.wine : colors.moss }}>{MEETING_TYPE_LABELS[item.meetingType]} · {item.count} logs</AppText>
+                    <AppText variant="label" style={{ color: item.average < 0 ? colors.wine : colors.moss }}>{meetingTypeLabel(item.meetingType, customMeetingTypes)} · {item.count} logs</AppText>
                     <AppText variant="title">{item.title}</AppText>
                     <AppText style={{ color: colors.inkSoft }}>Last six weeks average {formatSigned(item.average)}</AppText>
                   </View>
@@ -135,8 +136,8 @@ export default function InsightsScreen() {
           <View style={styles.snapshot}>
             <SectionTitle eyebrow="At a glance" title="What shaped the week" />
             <View style={styles.snapshotGrid}>
-              <Snapshot label="Most useful" value={summary.mostUsefulType ? MEETING_TYPE_LABELS[summary.mostUsefulType] : 'No clear leader'} tone="positive" />
-              <Snapshot label="Most draining" value={summary.mostDrainingType ? MEETING_TYPE_LABELS[summary.mostDrainingType] : 'No clear drag'} tone="negative" />
+              <Snapshot label="Most useful" value={summary.mostUsefulType ? meetingTypeLabel(summary.mostUsefulType, customMeetingTypes) : 'No clear leader'} tone="positive" />
+              <Snapshot label="Most draining" value={summary.mostDrainingType ? meetingTypeLabel(summary.mostDrainingType, customMeetingTypes) : 'No clear drag'} tone="negative" />
               <Snapshot label="Top friction" value={summary.topNegativeReason ? REASON_MAP[summary.topNegativeReason].label : 'None repeated'} tone="negative" />
               <Snapshot label="Best pattern" value={summary.bestPattern} tone="positive" />
             </View>
@@ -190,8 +191,8 @@ function Snapshot({ label, value, tone }: { label: string; value: string; tone: 
 
 const styles = StyleSheet.create({
   weekNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  navButton: { width: 46, height: 46, borderRadius: 23, borderWidth: 1, borderColor: colors.lineDark, backgroundColor: colors.surfaceGlass, alignItems: 'center', justifyContent: 'center', shadowColor: colors.shadow, shadowOpacity: 0.25, shadowRadius: 12 },
-  heroCard: { minHeight: 340, gap: spacing.lg, overflow: 'hidden' },
+  navButton: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', backgroundColor: 'rgba(17,24,39,0.62)', alignItems: 'center', justifyContent: 'center', shadowColor: colors.shadow, shadowOpacity: 0.25, shadowRadius: 12 },
+  heroCard: { minHeight: 320, gap: spacing.md, overflow: 'hidden' },
   heroTop: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.md },
   countBlock: { alignItems: 'flex-end', paddingBottom: 4 },
   balanceRow: { flexDirection: 'row', gap: spacing.md, flexWrap: 'wrap' },

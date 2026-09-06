@@ -110,8 +110,8 @@ function Metric({ value, label }: { value: string; label: string }) {
 }
 
 const styles = StyleSheet.create({
-  pulseCard: { minHeight: 236, gap: spacing.lg, overflow: 'hidden', justifyContent: 'space-between' },
-  pulseTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  pulseCard: { minHeight: 220, gap: spacing.md, overflow: 'hidden', justifyContent: 'space-between', paddingVertical: 22 },
+  pulseTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 72 },
   pulseDisc: {
     width: 58,
     height: 58,
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
   },
   pulseIconSlot: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -144,12 +144,12 @@ const styles = StyleSheet.create({
     height: 22,
     position: 'relative',
   },
-  rule: { height: 1, backgroundColor: colors.line },
-  metrics: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm },
-  metric: { flex: 1, gap: 2 },
+  rule: { height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255,255,255,0.10)' },
+  metrics: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.sm },
+  metric: { flex: 1, gap: 3 },
   list: { gap: spacing.md },
   intentionCard: { gap: spacing.md },
-  heroGlow: { position: 'absolute', width: 180, height: 180, borderRadius: 90, backgroundColor: colors.orange, opacity: 0.11, right: -58, top: -70, shadowColor: colors.orange, shadowOpacity: 0.9, shadowRadius: 70 },
-  orbitOne: { position: 'absolute', width: 170, height: 170, borderRadius: 85, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', right: -38, top: -42 },
-  orbitTwo: { position: 'absolute', width: 110, height: 110, borderRadius: 55, borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', right: -9, top: -11 },
+  heroGlow: { position: 'absolute', width: 200, height: 200, borderRadius: 100, backgroundColor: colors.orange, opacity: 0.13, right: -64, top: -82, shadowColor: colors.orange, shadowOpacity: 0.95, shadowRadius: 80 },
+  orbitOne: { position: 'absolute', width: 168, height: 168, borderRadius: 84, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.10)', right: -36, top: -48 },
+  orbitTwo: { position: 'absolute', width: 108, height: 108, borderRadius: 54, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.14)', right: -8, top: -16 },
 });

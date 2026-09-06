@@ -24,28 +24,28 @@ export const colors = {
 };
 
 export const spacing = {
-  xs: 6,
-  sm: 10,
-  md: 16,
-  lg: 24,
-  xl: 32,
-  xxl: 48,
+  xs: 4,
+  sm: 8,
+  md: 14,
+  lg: 20,
+  xl: 28,
+  xxl: 40,
 };
 
 export const radius = {
   sm: 12,
-  md: 20,
-  lg: 28,
+  md: 18,
+  lg: 24,
   round: 999,
 };
 
 export const gradients = {
-  screen: ['#070A12', '#0B1020', '#0E1728'] as const,
+  screen: ['#060910', '#0A1220', '#101A2C'] as const,
   primary: ['#FF7257', '#FF9C58'] as const,
-  hero: ['#182744', '#121A2C', '#2A1925'] as const,
+  hero: ['#1B2C4A', '#121A2C', '#2A1924'] as const,
   positive: ['#14372F', '#12273A'] as const,
   negative: ['#3C1D2B', '#1A2438'] as const,
-  glass: ['rgba(32, 46, 72, 0.88)', 'rgba(17, 24, 39, 0.92)'] as const,
+  glass: ['rgba(36, 50, 76, 0.82)', 'rgba(14, 20, 34, 0.90)'] as const,
 };
 
 export const fonts = {

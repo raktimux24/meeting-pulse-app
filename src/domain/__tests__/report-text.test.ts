@@ -57,5 +57,6 @@ describe('reminder prefs', () => {
   it('falls back to a disabled 6pm reminder', () => {
     expect(parseReminderPrefs(null)).toEqual({ enabled: false, hour: 18, minute: 0 });
     expect(parseReminderPrefs('{"enabled":true,"hour":19,"minute":0}')).toEqual({ enabled: true, hour: 19, minute: 0 });
+    expect(parseReminderPrefs('{"enabled":true,"hour":99,"minute":80}')).toEqual({ enabled: true, hour: 23, minute: 59 });
   });
 });

@@ -1,4 +1,4 @@
-import type { MeetingType, Mood, Reason } from './types';
+import type { DefaultMeetingType, Mood, Reason } from './types';
 
 export const MOOD_CONFIG: Record<Mood, { label: string; score: number; short: string }> = {
   energized: { label: 'Energized', score: 3, short: 'Energy up' },
@@ -11,7 +11,7 @@ export const MOOD_CONFIG: Record<Mood, { label: string; score: number; short: st
   anxious: { label: 'Anxious', score: -3, short: 'Uneasy' },
 };
 
-export const MEETING_TYPE_LABELS: Record<MeetingType, string> = {
+export const MEETING_TYPE_LABELS: Record<DefaultMeetingType, string> = {
   standup: 'Standup',
   review: 'Review',
   planning: 'Planning',

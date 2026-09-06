@@ -24,7 +24,13 @@ export const MEETING_TYPES = [
   'other',
 ] as const;
 
-export type MeetingType = (typeof MEETING_TYPES)[number];
+export type DefaultMeetingType = (typeof MEETING_TYPES)[number];
+export type MeetingType = string;
+
+export type CustomMeetingType = {
+  id: MeetingType;
+  label: string;
+};
 
 export const REASON_IDS = [
   'clear-outcome',

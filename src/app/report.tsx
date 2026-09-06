@@ -8,7 +8,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Share, StyleSheet, View } from 'react-native';
 
 import { AppText, Button, formatSigned, Screen } from '@/components/ui';
-import { MEETING_TYPE_LABELS, REASON_MAP } from '@/domain/constants';
+import { REASON_MAP } from '@/domain/constants';
+import { meetingTypeLabel } from '@/domain/meeting-types';
 import { summarizeWeek } from '@/domain/insights';
 import { buildReportShareText } from '@/domain/report-text';
 import type { Meeting } from '@/domain/types';
@@ -17,7 +18,7 @@ import { colors, fonts, gradients, radius, spacing } from '@/theme/tokens';
 
 export default function ReportScreen() {
   const { start: startParam } = useLocalSearchParams<{ start: string }>();
-  const { getRange, weekStartsOn } = useAppData();
+  const { getRange, weekStartsOn, customMeetingTypes } = useAppData();
   const start = useMemo(() => new Date(startParam), [startParam]);
   const end = useMemo(() => endOfWeek(start, { weekStartsOn }), [start, weekStartsOn]);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
@@ -72,8 +73,8 @@ export default function ReportScreen() {
         </View>
 
         <View style={styles.reportBody}>
-          <ReportLine label="Most useful" value={summary.mostUsefulType ? MEETING_TYPE_LABELS[summary.mostUsefulType] : 'No clear leader'} />
-          <ReportLine label="Most draining" value={summary.mostDrainingType ? MEETING_TYPE_LABELS[summary.mostDrainingType] : 'No clear drag'} />
+          <ReportLine label="Most useful" value={summary.mostUsefulType ? meetingTypeLabel(summary.mostUsefulType, customMeetingTypes) : 'No clear leader'} />
+          <ReportLine label="Most draining" value={summary.mostDrainingType ? meetingTypeLabel(summary.mostDrainingType, customMeetingTypes) : 'No clear drag'} />
           <ReportLine label="Top issue" value={summary.topNegativeReason ? REASON_MAP[summary.topNegativeReason].label : 'None repeated'} />
         </View>
 
