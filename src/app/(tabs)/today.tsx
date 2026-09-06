@@ -114,10 +114,10 @@ function Metric({ value, label, hint }: { value: string; label: string; hint?: s
 }
 
 const styles = StyleSheet.create({
-  pulseCard: { gap: 18, overflow: 'hidden', paddingVertical: 20 },
-  pulseTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  pulseCopy: { flex: 1, gap: 6, paddingRight: spacing.md, justifyContent: 'center' },
-  pulseStage: { width: 88, height: 88, alignItems: 'center', justifyContent: 'center', marginRight: -4 },
+  pulseCard: { gap: 16, overflow: 'hidden', paddingVertical: 20 },
+  pulseTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  pulseCopy: { flex: 1, gap: 6, paddingRight: spacing.md },
+  pulseStage: { width: 88, height: 88, alignItems: 'center', justifyContent: 'center' },
   pulseDisc: {
     width: 56,
     height: 56,

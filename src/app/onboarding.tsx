@@ -44,13 +44,15 @@ export default function OnboardingScreen() {
                 <AppText style={styles.scoreNumber}>6</AppText>
               </View>
             </LinearGradient>
-            <View style={styles.signalTag}>
-              <View style={styles.tagIcon}><Sparkles size={13} color={colors.orange} /></View>
-              <AppText variant="small">No decision</AppText>
-            </View>
-            <View style={styles.returnTag}>
-              <View style={styles.tagIcon}><View style={styles.returnDot} /></View>
-              <AppText variant="small">Clarity −2</AppText>
+            <View pointerEvents="none" style={styles.tagRing}>
+              <View style={styles.signalTag}>
+                <View style={styles.tagIcon}><Sparkles size={13} color={colors.orange} /></View>
+                <AppText variant="small">No decision</AppText>
+              </View>
+              <View style={styles.returnTag}>
+                <View style={styles.tagIcon}><View style={styles.returnDot} /></View>
+                <AppText variant="small">Clarity −2</AppText>
+              </View>
             </View>
           </View>
 
@@ -107,13 +109,14 @@ const styles = StyleSheet.create({
   orbitOuter: { width: 214, height: 214 },
   orbitMid: { width: 180, height: 180 },
   orbitInner: { width: 148, height: 148 },
-  scoreBubble: { width: 136, height: 136, borderRadius: 68, alignItems: 'center', justifyContent: 'center', gap: 10, paddingTop: 2, shadowColor: colors.orange, shadowOffset: { width: 0, height: 16 }, shadowOpacity: 0.4, shadowRadius: 28, elevation: 12 },
+  scoreBubble: { width: 136, height: 136, borderRadius: 68, alignItems: 'center', justifyContent: 'center', gap: 12, shadowColor: colors.orange, shadowOffset: { width: 0, height: 16 }, shadowOpacity: 0.4, shadowRadius: 28, elevation: 12 },
   liveLabel: { color: 'rgba(255,255,255,0.78)' },
-  scoreValue: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 54, paddingRight: 4 },
-  scoreSign: { color: colors.white, fontFamily: fonts.display, fontSize: 40, lineHeight: 54, width: 20, textAlign: 'center', marginTop: -1 },
-  scoreNumber: { color: colors.white, fontFamily: fonts.display, fontSize: 52, lineHeight: 54, letterSpacing: -1.4 },
-  signalTag: { position: 'absolute', right: 18, top: 40, minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', borderRadius: radius.round, paddingHorizontal: 12, paddingVertical: 8, overflow: 'hidden', shadowColor: colors.shadow, shadowOpacity: 0.28, shadowRadius: 12 },
-  returnTag: { position: 'absolute', left: 18, bottom: 44, minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', borderRadius: radius.round, paddingHorizontal: 12, paddingVertical: 8, overflow: 'hidden' },
+  scoreValue: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 52, paddingLeft: 3 },
+  scoreSign: { color: colors.white, fontFamily: fonts.display, fontSize: 42, lineHeight: 52, marginRight: -4, marginTop: 3 },
+  scoreNumber: { color: colors.white, fontFamily: fonts.display, fontSize: 50, lineHeight: 52, letterSpacing: -1.2 },
+  tagRing: { position: 'absolute', width: 214, height: 214 },
+  signalTag: { position: 'absolute', right: -38, top: 16, minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', borderRadius: radius.round, paddingHorizontal: 12, paddingVertical: 8, shadowColor: colors.shadow, shadowOpacity: 0.28, shadowRadius: 12 },
+  returnTag: { position: 'absolute', left: -34, bottom: 22, minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', borderRadius: radius.round, paddingHorizontal: 12, paddingVertical: 8 },
   tagIcon: { width: 14, height: 14, alignItems: 'center', justifyContent: 'center' },
   returnDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.wine },
   copy: { gap: spacing.sm },
