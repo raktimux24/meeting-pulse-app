@@ -33,14 +33,25 @@ export default function OnboardingScreen() {
         <>
           <View style={[styles.heroVisual, compact && styles.heroVisualCompact]}>
             <View style={styles.visualGlow} />
+            <View style={[styles.orbit, styles.orbitHalo]} />
             <View style={[styles.orbit, styles.orbitOuter]} />
+            <View style={[styles.orbit, styles.orbitMid]} />
             <View style={[styles.orbit, styles.orbitInner]} />
             <LinearGradient colors={gradients.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.scoreBubble}>
-              <AppText variant="label" style={{ color: 'rgba(255,255,255,0.78)' }}>Live signal</AppText>
-              <AppText variant="hero" style={{ color: colors.white, fontSize: 58, lineHeight: 62 }}>−6</AppText>
+              <AppText variant="label" style={styles.liveLabel}>Live signal</AppText>
+              <View style={styles.scoreValue} accessibilityLabel="negative 6 live signal">
+                <AppText style={styles.scoreSign}>−</AppText>
+                <AppText style={styles.scoreNumber}>6</AppText>
+              </View>
             </LinearGradient>
-            <View style={styles.signalTag}><Sparkles size={15} color={colors.orange} /><AppText variant="small">No decision</AppText></View>
-            <View style={styles.returnTag}><View style={styles.returnDot} /><AppText variant="small">Clarity −2</AppText></View>
+            <View style={styles.signalTag}>
+              <View style={styles.tagIcon}><Sparkles size={13} color={colors.orange} /></View>
+              <AppText variant="small">No decision</AppText>
+            </View>
+            <View style={styles.returnTag}>
+              <View style={styles.tagIcon}><View style={styles.returnDot} /></View>
+              <AppText variant="small">Clarity −2</AppText>
+            </View>
           </View>
 
           <View style={styles.copy}>
@@ -88,16 +99,23 @@ const styles = StyleSheet.create({
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   brandMark: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, borderColor: colors.orange, backgroundColor: colors.orangeSoft, alignItems: 'center', justifyContent: 'center', shadowColor: colors.orange, shadowOpacity: 0.45, shadowRadius: 12 },
   brandDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.orange },
-  heroVisual: { height: 260, alignItems: 'center', justifyContent: 'center', transform: [{ scale: 0.92 }] },
-  heroVisualCompact: { height: 220, transform: [{ scale: 0.82 }] },
-  visualGlow: { position: 'absolute', width: 230, height: 230, borderRadius: 115, backgroundColor: colors.orange, opacity: 0.13, shadowColor: colors.orange, shadowOpacity: 0.9, shadowRadius: 100 },
-  orbit: { position: 'absolute', borderWidth: 1, borderColor: colors.lineDark, borderRadius: 999 },
-  orbitOuter: { width: 278, height: 278 },
-  orbitInner: { width: 198, height: 198 },
-  scoreBubble: { width: 150, height: 150, borderRadius: 75, alignItems: 'center', justifyContent: 'center', shadowColor: colors.orange, shadowOffset: { width: 0, height: 18 }, shadowOpacity: 0.42, shadowRadius: 30, elevation: 12 },
-  signalTag: { position: 'absolute', right: -2, top: 38, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.lineDark, borderRadius: radius.round, paddingHorizontal: 13, paddingVertical: 10, shadowColor: colors.shadow, shadowOpacity: 0.3, shadowRadius: 14 },
-  returnTag: { position: 'absolute', left: 0, bottom: 35, flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.lineDark, borderRadius: radius.round, paddingHorizontal: 13, paddingVertical: 10 },
-  returnDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.wine, shadowColor: colors.wine, shadowOpacity: 0.8, shadowRadius: 8 },
+  heroVisual: { height: 276, width: '100%', alignItems: 'center', justifyContent: 'center' },
+  heroVisualCompact: { height: 236 },
+  visualGlow: { position: 'absolute', width: 200, height: 200, borderRadius: 100, backgroundColor: colors.orange, opacity: 0.14, shadowColor: colors.orange, shadowOpacity: 0.9, shadowRadius: 90 },
+  orbit: { position: 'absolute', borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.16)', borderRadius: 999 },
+  orbitHalo: { width: 248, height: 248 },
+  orbitOuter: { width: 214, height: 214 },
+  orbitMid: { width: 180, height: 180 },
+  orbitInner: { width: 148, height: 148 },
+  scoreBubble: { width: 136, height: 136, borderRadius: 68, alignItems: 'center', justifyContent: 'center', gap: 10, paddingTop: 2, shadowColor: colors.orange, shadowOffset: { width: 0, height: 16 }, shadowOpacity: 0.4, shadowRadius: 28, elevation: 12 },
+  liveLabel: { color: 'rgba(255,255,255,0.78)' },
+  scoreValue: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 54, paddingRight: 4 },
+  scoreSign: { color: colors.white, fontFamily: fonts.display, fontSize: 40, lineHeight: 54, width: 20, textAlign: 'center', marginTop: -1 },
+  scoreNumber: { color: colors.white, fontFamily: fonts.display, fontSize: 52, lineHeight: 54, letterSpacing: -1.4 },
+  signalTag: { position: 'absolute', right: 18, top: 40, minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', borderRadius: radius.round, paddingHorizontal: 12, paddingVertical: 8, overflow: 'hidden', shadowColor: colors.shadow, shadowOpacity: 0.28, shadowRadius: 12 },
+  returnTag: { position: 'absolute', left: 18, bottom: 44, minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', borderRadius: radius.round, paddingHorizontal: 12, paddingVertical: 8, overflow: 'hidden' },
+  tagIcon: { width: 14, height: 14, alignItems: 'center', justifyContent: 'center' },
+  returnDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.wine },
   copy: { gap: spacing.sm },
   headingCompact: { fontSize: 37, lineHeight: 39 },
   subtitle: { color: colors.inkSoft, fontSize: 17, lineHeight: 26, fontFamily: fonts.body },

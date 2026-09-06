@@ -46,26 +46,30 @@ export default function TodayScreen() {
 
       <GradientCard colors={gradients.hero} style={styles.pulseCard}>
         <View pointerEvents="none" style={styles.heroGlow} />
-        <View pointerEvents="none" style={styles.orbitOne} />
-        <View pointerEvents="none" style={styles.orbitTwo} />
         <View style={styles.pulseTop}>
-          <View>
+          <View style={styles.pulseCopy}>
             <AppText variant="label" style={{ color: colors.orange }}>Energy balance</AppText>
             <AppText variant="hero" accessibilityLabel={`${pulse >= 0 ? 'positive' : 'negative'} ${Math.abs(pulse)} energy balance`}>
               {formatSigned(pulse)}
             </AppText>
           </View>
-          <PulseDisc pulse={pulse} />
+          <View style={styles.pulseStage}>
+            <View pointerEvents="none" style={styles.orbitOne} />
+            <View pointerEvents="none" style={styles.orbitTwo} />
+            <PulseDisc pulse={pulse} />
+          </View>
         </View>
         <View style={styles.rule} />
         <View style={styles.metrics}>
           <Metric value={`${meetings.length}`} label="Meetings" />
+          <View style={styles.metricRule} />
           <Metric value={totalMinutes >= 60 ? `${(totalMinutes / 60).toFixed(totalMinutes % 60 ? 1 : 0)}h` : `${totalMinutes}m`} label="In calls" />
-          <Metric value={`${positive}/${neutral}/${negative}`} label="Returned · neutral · cost" />
+          <View style={styles.metricRule} />
+          <Metric value={`${positive}/${neutral}/${negative}`} label="Return mix" hint={`${positive} returned, ${neutral} neutral, ${negative} cost`} />
         </View>
       </GradientCard>
 
-      <Button label="Log a meeting" onPress={() => router.push({ pathname: '/log', params: { from: 'today' } })} icon={<Plus size={20} color={colors.white} />} />
+      <Button style={styles.logButton} label="Log a meeting" onPress={() => router.push({ pathname: '/log', params: { from: 'today' } })} icon={<Plus size={20} color={colors.white} />} />
 
       <View style={styles.list}>
         <SectionTitle eyebrow="Daily log" title={meetings.length ? `${meetings.length} reflection${meetings.length === 1 ? '' : 's'}` : 'Your meetings'} />
@@ -100,22 +104,24 @@ function PulseDisc({ pulse }: { pulse: number }) {
   );
 }
 
-function Metric({ value, label }: { value: string; label: string }) {
+function Metric({ value, label, hint }: { value: string; label: string; hint?: string }) {
   return (
-    <View style={styles.metric} accessibilityLabel={`${value} ${label}`}>
-      <AppText variant="title" style={{ fontFamily: fonts.bodyBold }}>{value}</AppText>
-      <AppText variant="small" style={{ color: colors.inkSoft }}>{label}</AppText>
+    <View style={styles.metric} accessibilityLabel={hint ?? `${value} ${label}`}>
+      <AppText variant="title" style={styles.metricValue}>{value}</AppText>
+      <AppText variant="small" numberOfLines={1} style={styles.metricLabel}>{label}</AppText>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  pulseCard: { minHeight: 220, gap: spacing.md, overflow: 'hidden', justifyContent: 'space-between', paddingVertical: 22 },
-  pulseTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 72 },
+  pulseCard: { gap: 18, overflow: 'hidden', paddingVertical: 20 },
+  pulseTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  pulseCopy: { flex: 1, gap: 6, paddingRight: spacing.md, justifyContent: 'center' },
+  pulseStage: { width: 88, height: 88, alignItems: 'center', justifyContent: 'center', marginRight: -4 },
   pulseDisc: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     borderWidth: 1.5,
     backgroundColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center',
@@ -145,11 +151,15 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   rule: { height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255,255,255,0.10)' },
-  metrics: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.sm },
-  metric: { flex: 1, gap: 3 },
+  metrics: { flexDirection: 'row', alignItems: 'flex-start' },
+  metric: { flex: 1, minWidth: 0, gap: 4 },
+  metricValue: { fontFamily: fonts.bodyBold, lineHeight: 22 },
+  metricLabel: { color: colors.inkSoft },
+  metricRule: { width: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255,255,255,0.10)', marginHorizontal: 12, alignSelf: 'stretch', minHeight: 36 },
+  logButton: { marginTop: 8 },
   list: { gap: spacing.md },
   intentionCard: { gap: spacing.md },
-  heroGlow: { position: 'absolute', width: 200, height: 200, borderRadius: 100, backgroundColor: colors.orange, opacity: 0.13, right: -64, top: -82, shadowColor: colors.orange, shadowOpacity: 0.95, shadowRadius: 80 },
-  orbitOne: { position: 'absolute', width: 168, height: 168, borderRadius: 84, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.10)', right: -36, top: -48 },
-  orbitTwo: { position: 'absolute', width: 108, height: 108, borderRadius: 54, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.14)', right: -8, top: -16 },
+  heroGlow: { position: 'absolute', width: 160, height: 160, borderRadius: 80, backgroundColor: colors.orange, opacity: 0.12, right: -28, top: -70, shadowColor: colors.orange, shadowOpacity: 0.9, shadowRadius: 70 },
+  orbitOne: { position: 'absolute', width: 88, height: 88, borderRadius: 44, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.12)' },
+  orbitTwo: { position: 'absolute', width: 72, height: 72, borderRadius: 36, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.16)' },
 });
