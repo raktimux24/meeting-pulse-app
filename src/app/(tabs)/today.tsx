@@ -1,5 +1,5 @@
 import { endOfDay, format, startOfDay } from 'date-fns';
-import { ArrowUpRight, Plus } from 'lucide-react-native';
+import { ArrowDownRight, ArrowRight, ArrowUpRight, Plus } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -55,9 +55,7 @@ export default function TodayScreen() {
               {formatSigned(pulse)}
             </AppText>
           </View>
-          <View style={[styles.pulseDisc, { borderColor: pulse > 0 ? colors.moss : pulse < 0 ? colors.wine : colors.amber }]}>
-            <ArrowUpRight size={25} color={colors.white} style={{ transform: [{ rotate: pulse < 0 ? '90deg' : pulse === 0 ? '45deg' : '0deg' }] }} />
-          </View>
+          <PulseDisc pulse={pulse} />
         </View>
         <View style={styles.rule} />
         <View style={styles.metrics}>
@@ -87,6 +85,21 @@ export default function TodayScreen() {
   );
 }
 
+function PulseDisc({ pulse }: { pulse: number }) {
+  const Icon = pulse > 0 ? ArrowUpRight : pulse < 0 ? ArrowDownRight : ArrowRight;
+  const borderColor = pulse > 0 ? colors.moss : pulse < 0 ? colors.wine : colors.amber;
+
+  return (
+    <View style={[styles.pulseDisc, { borderColor }]} accessibilityElementsHidden>
+      <View style={styles.pulseIconSlot}>
+        <View style={styles.pulseIcon}>
+          <Icon size={22} color={colors.white} strokeWidth={2.25} style={styles.pulseGlyph} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
 function Metric({ value, label }: { value: string; label: string }) {
   return (
     <View style={styles.metric} accessibilityLabel={`${value} ${label}`}>
@@ -99,7 +112,38 @@ function Metric({ value, label }: { value: string; label: string }) {
 const styles = StyleSheet.create({
   pulseCard: { minHeight: 236, gap: spacing.lg, overflow: 'hidden', justifyContent: 'space-between' },
   pulseTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  pulseDisc: { width: 58, height: 58, borderRadius: 29, borderWidth: 1.5, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center', shadowColor: colors.orange, shadowOpacity: 0.28, shadowRadius: 18 },
+  pulseDisc: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    borderWidth: 1.5,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    position: 'relative',
+    shadowColor: colors.orange,
+    shadowOpacity: 0.28,
+    shadowRadius: 18,
+  },
+  pulseIconSlot: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pulseIcon: {
+    width: 22,
+    height: 22,
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  pulseGlyph: {
+    width: 22,
+    height: 22,
+    position: 'relative',
+  },
   rule: { height: 1, backgroundColor: colors.line },
   metrics: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm },
   metric: { flex: 1, gap: 2 },
