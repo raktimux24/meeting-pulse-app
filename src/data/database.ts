@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 3;
 
 export async function migrateDatabase(db: SQLiteDatabase) {
   await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
@@ -33,6 +33,30 @@ export async function migrateDatabase(db: SQLiteDatabase) {
         value TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_meetings_occurred_at ON meetings(occurred_at);
+    `);
+  }
+
+  if (currentVersion < 2) {
+    const columns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(meetings)');
+    const names = new Set(columns.map((column) => column.name));
+    if (!names.has('decision_status')) await db.execAsync('ALTER TABLE meetings ADD COLUMN decision_status TEXT;');
+    if (!names.has('ownership_status')) await db.execAsync('ALTER TABLE meetings ADD COLUMN ownership_status TEXT;');
+    if (!names.has('next_step_status')) await db.execAsync('ALTER TABLE meetings ADD COLUMN next_step_status TEXT;');
+  }
+
+  if (currentVersion < 3) {
+    const columns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(meetings)');
+    const names = new Set(columns.map((column) => column.name));
+    if (!names.has('intended_outcome')) await db.execAsync('ALTER TABLE meetings ADD COLUMN intended_outcome TEXT;');
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS quick_pulses (
+        id TEXT PRIMARY KEY NOT NULL,
+        occurred_at TEXT NOT NULL,
+        mood TEXT NOT NULL,
+        reason_id TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_quick_pulses_occurred_at ON quick_pulses(occurred_at);
     `);
   }
 

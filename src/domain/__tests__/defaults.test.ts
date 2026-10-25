@@ -14,6 +14,10 @@ const base: Meeting = {
   mood: 'clear',
   impactScore: 2,
   reasonIds: [],
+  decisionStatus: null,
+  ownershipStatus: null,
+  nextStepStatus: null,
+  intendedOutcome: null,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 };

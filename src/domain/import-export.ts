@@ -1,11 +1,18 @@
 import { parseCustomMeetingTypes } from './meeting-types';
-import { exportedMeetingSchema, exportPayloadSchema } from './validation';
-import type { CustomMeetingType, MeetingInput } from './types';
+import { parseCustomReasons } from './custom-reasons';
+import { normalizeMeetingBudget } from './budget';
+import { parseSeriesReviews } from './series-reviews';
+import { exportedMeetingSchema, exportPayloadSchema, quickPulseSchema } from './validation';
+import type { CustomMeetingType, CustomReason, MeetingBudgetPrefs, MeetingInput, QuickPulse, SeriesReview } from './types';
 
 export type ImportPreview = {
   meetings: MeetingInput[];
   weekStartsOn: 0 | 1 | null;
   customMeetingTypes: CustomMeetingType[];
+  customReasons: CustomReason[];
+  meetingBudget: MeetingBudgetPrefs | null;
+  quickPulses: Omit<QuickPulse, 'id' | 'createdAt'>[];
+  seriesReviews: SeriesReview[];
   imported: number;
   skipped: number;
 };
@@ -39,13 +46,27 @@ export function parseExportPayload(raw: unknown): ImportPreview {
       note: parsed.data.note,
       mood: parsed.data.mood,
       reasonIds: parsed.data.reasonIds,
+      decisionStatus: parsed.data.decisionStatus,
+      ownershipStatus: parsed.data.ownershipStatus,
+      nextStepStatus: parsed.data.nextStepStatus,
+      intendedOutcome: parsed.data.intendedOutcome,
     });
+  });
+
+  const quickPulses = (payload.data.quickPulses ?? []).flatMap((item) => {
+    const parsed = quickPulseSchema.safeParse(item);
+    if (!parsed.success || Number.isNaN(new Date(parsed.data.occurredAt).getTime())) return [];
+    return [{ occurredAt: new Date(parsed.data.occurredAt).toISOString(), mood: parsed.data.mood, reasonId: parsed.data.reasonId }];
   });
 
   return {
     meetings,
     weekStartsOn: payload.data.weekStartsOn ?? null,
     customMeetingTypes: parseCustomMeetingTypes(JSON.stringify(payload.data.customMeetingTypes ?? [])),
+    customReasons: parseCustomReasons(JSON.stringify(payload.data.customReasons ?? [])),
+    meetingBudget: payload.data.meetingBudget == null ? null : normalizeMeetingBudget(payload.data.meetingBudget),
+    quickPulses,
+    seriesReviews: parseSeriesReviews(JSON.stringify(payload.data.seriesReviews ?? [])),
     imported: meetings.length,
     skipped,
   };

@@ -11,6 +11,9 @@ export const MOODS = [
 
 export type Mood = (typeof MOODS)[number];
 
+export const OUTCOME_STATUSES = ['yes', 'no', 'not-needed'] as const;
+export type OutcomeStatus = (typeof OUTCOME_STATUSES)[number];
+
 export const MEETING_TYPES = [
   'standup',
   'review',
@@ -32,6 +35,15 @@ export type CustomMeetingType = {
   label: string;
 };
 
+export type ReasonSentiment = 'positive' | 'negative';
+
+export type CustomReason = {
+  id: string;
+  label: string;
+  sentiment: ReasonSentiment;
+  active?: boolean;
+};
+
 export const REASON_IDS = [
   'clear-outcome',
   'good-facilitation',
@@ -49,6 +61,7 @@ export const REASON_IDS = [
   'dominated-by-one-person',
   'too-long',
   'last-minute-invite',
+  'not-needed-here',
 ] as const;
 
 export type ReasonId = (typeof REASON_IDS)[number];
@@ -57,7 +70,7 @@ export type Reason = {
   id: ReasonId;
   label: string;
   modifier: number;
-  sentiment: 'positive' | 'negative';
+  sentiment: ReasonSentiment;
 };
 
 export type Meeting = {
@@ -70,12 +83,27 @@ export type Meeting = {
   note: string;
   mood: Mood;
   impactScore: number;
-  reasonIds: ReasonId[];
+  reasonIds: string[];
+  decisionStatus: OutcomeStatus | null;
+  ownershipStatus: OutcomeStatus | null;
+  nextStepStatus: OutcomeStatus | null;
+  intendedOutcome: string | null;
   createdAt: string;
   updatedAt: string;
 };
 
-export type MeetingInput = Omit<Meeting, 'id' | 'impactScore' | 'createdAt' | 'updatedAt'>;
+type OptionalReflectionFields = Pick<Meeting, 'decisionStatus' | 'ownershipStatus' | 'nextStepStatus' | 'intendedOutcome'>;
+
+export type MeetingInput = Omit<Meeting, 'id' | 'impactScore' | 'createdAt' | 'updatedAt' | keyof OptionalReflectionFields> &
+  Partial<OptionalReflectionFields>;
+
+export type QuickPulse = {
+  id: string;
+  occurredAt: string;
+  mood: Mood;
+  reasonId: string | null;
+  createdAt: string;
+};
 
 export type Insight = {
   id: string;
@@ -114,18 +142,47 @@ export type SeriesPulse = {
   meetingType: MeetingType;
   count: number;
   average: number;
+  recentAverage: number;
+  previousAverage: number | null;
+  trend: number | null;
 };
+
+export const EXPERIMENT_RESULTS = ['helped', 'somewhat', 'no', 'not-tried'] as const;
+export type ExperimentResult = (typeof EXPERIMENT_RESULTS)[number];
 
 export type WeeklyIntention = {
   text: string;
   weekStartIso: string;
   tried: boolean;
+  sourceInsightId?: string;
+  experimentTemplateId?: string;
+  result?: ExperimentResult;
+  reviewedAt?: string;
+};
+
+export const SERIES_DECISIONS = ['keep', 'shorten', 'async', 'drop'] as const;
+export type SeriesDecision = (typeof SERIES_DECISIONS)[number];
+
+export type SeriesReview = {
+  key: string;
+  title: string;
+  meetingType: MeetingType;
+  decision: SeriesDecision;
+  updatedAt: string;
 };
 
 export type ReminderPrefs = {
   enabled: boolean;
   hour: number;
   minute: number;
+};
+
+export type MeetingBudgetPrefs = {
+  enabled: boolean;
+  weeklyMinutes: number | null;
+  maxCostMeetings: number | null;
+  maxBlockMinutes: number | null;
+  preferredBufferMinutes: 10 | 15 | 30 | null;
 };
 
 export type LogOrigin = 'today' | 'history' | 'insights';

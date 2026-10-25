@@ -4,6 +4,8 @@ import { REASON_MAP } from './constants';
 import { meetingTypeLabel } from './meeting-types';
 import { getPulseClassification } from './scoring';
 import { getRecurringSeries } from './series';
+import { generateOutcomeInsights } from './outcomes';
+import { summarizeRecovery } from './recovery';
 import type { Insight, Meeting, MeetingType, ReasonId, WeekDelta, WeekSummary } from './types';
 
 function average(values: number[]) {
@@ -27,7 +29,8 @@ function topNegativeReason(meetings: Meeting[]): ReasonId | null {
   const counts = new Map<ReasonId, number>();
   meetings.forEach((meeting) =>
     meeting.reasonIds.forEach((id) => {
-      if (REASON_MAP[id].sentiment === 'negative') counts.set(id, (counts.get(id) ?? 0) + 1);
+      const reason = REASON_MAP[id as ReasonId];
+      if (reason?.sentiment === 'negative') counts.set(reason.id, (counts.get(reason.id) ?? 0) + 1);
     }),
   );
   return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
@@ -50,7 +53,10 @@ export function generateInsights(meetings: Meeting[]): Insight[] {
     ];
   }
 
-  if (leadingReason === 'no-decision') {
+  const outcomeInsights = generateOutcomeInsights(meetings);
+  insights.push(...outcomeInsights);
+
+  if (leadingReason === 'no-decision' && !outcomeInsights.some((insight) => insight.id === 'outcome-decision')) {
     insights.push({
       id: 'no-decision',
       eyebrow: 'Closure gap',
@@ -66,6 +72,16 @@ export function generateInsights(meetings: Meeting[]): Insight[] {
       eyebrow: 'Async opportunity',
       title: `${reasonCount('could-have-been-async')} calls could have been updates`,
       body: 'Move status sharing into a written update and protect live time for debate and decisions.',
+      tone: 'negative',
+    });
+  }
+
+  if (reasonCount('not-needed-here') >= 3) {
+    insights.push({
+      id: 'not-needed-here',
+      eyebrow: 'Attendance fit',
+      title: `${reasonCount('not-needed-here')} meetings did not need your contribution`,
+      body: 'Before accepting the next invite, ask what decision or contribution needs you live.',
       tone: 'negative',
     });
   }
@@ -196,6 +212,17 @@ export function generateInsights(meetings: Meeting[]): Insight[] {
       eyebrow: 'Repeated friction',
       title: 'The same format keeps ending without a decision',
       body: 'Write the desired outcome at the top, or move the update to an async note.',
+      tone: 'negative',
+    });
+  }
+
+  const recovery = summarizeRecovery(meetings);
+  if (recovery.comparisonReady) {
+    insights.push({
+      id: 'recovery-tight-turnarounds',
+      eyebrow: 'Recovery pattern',
+      title: 'Tight turnarounds are landing harder',
+      body: 'Among meetings you logged, sessions after a 15+ minute gap landed better. Try one buffer and review the pattern next week.',
       tone: 'negative',
     });
   }

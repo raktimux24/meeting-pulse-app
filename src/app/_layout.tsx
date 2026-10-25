@@ -1,10 +1,11 @@
 import { useFonts } from 'expo-font';
-import { Stack, ThemeProvider } from 'expo-router';
+import { Stack, ThemeProvider, useRouter } from 'expo-router';
+import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
 import { SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
 import { Suspense, useEffect } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
 
 import { migrateDatabase } from '@/data/database';
 import { AppDataProvider } from '@/providers/app-data-provider';
@@ -51,6 +52,7 @@ export default function RootLayout() {
       <Suspense fallback={<View style={styles.loading}><ActivityIndicator color={colors.orange} /></View>}>
         <SQLiteProvider databaseName="meeting-pulse.db" onInit={migrateDatabase} useSuspense>
           <AppDataProvider>
+            <NotificationRouteObserver />
             <StatusBar style="light" />
             <Stack
             screenOptions={{
@@ -66,16 +68,42 @@ export default function RootLayout() {
               <Stack.Screen name="onboarding" options={{ headerShown: false }} />
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen name="log" options={{ presentation: 'modal', header: () => <StackHeader title="Log a meeting" modal /> }} />
+              <Stack.Screen name="quick-pulse" options={{ presentation: 'modal', header: () => <StackHeader title="Quick Pulse" modal /> }} />
+              <Stack.Screen name="quick-pulses" options={{ header: () => <StackHeader title="Quick Pulses" /> }} />
+              <Stack.Screen name="calendar-assist" options={{ header: () => <StackHeader title="Calendar Assist" /> }} />
               <Stack.Screen name="result" options={{ headerShown: false, gestureEnabled: false }} />
               <Stack.Screen name="meeting/[id]" options={{ header: () => <StackHeader title="Meeting details" /> }} />
               <Stack.Screen name="settings" options={{ header: () => <StackHeader title="Settings" /> }} />
               <Stack.Screen name="report" options={{ presentation: 'modal', header: () => <StackHeader title="Weekly report" modal /> }} />
+              <Stack.Screen name="team-experiment" options={{ presentation: 'modal', header: () => <StackHeader title="Team experiment" modal /> }} />
             </Stack>
           </AppDataProvider>
         </SQLiteProvider>
       </Suspense>
     </ThemeProvider>
   );
+}
+
+function NotificationRouteObserver() {
+  const router = useRouter();
+  useEffect(() => {
+    if (Platform.OS === 'web') return undefined;
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const url = response.notification.request.content.data?.url;
+      if (url === '/quick-pulse') {
+        router.push('/quick-pulse');
+        void Notifications.clearLastNotificationResponseAsync();
+      }
+    });
+    void Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response?.notification.request.content.data?.url === '/quick-pulse') {
+        router.push('/quick-pulse');
+        void Notifications.clearLastNotificationResponseAsync();
+      }
+    });
+    return () => subscription.remove();
+  }, [router]);
+  return null;
 }
 
 const styles = StyleSheet.create({ loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.paper } });

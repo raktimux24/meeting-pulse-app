@@ -7,6 +7,7 @@ import { StyleSheet, View } from 'react-native';
 import { AppText, Button, Card, LoadingState, NotFoundState, formatSigned, Screen } from '@/components/ui';
 import { MOOD_CONFIG, REASON_MAP } from '@/domain/constants';
 import { originPath } from '@/domain/format';
+import { answeredOutcomeCount, OUTCOME_STATUS_LABELS } from '@/domain/outcomes';
 import { getDurationMultiplier, getImpactLabel, getMeetingSuggestion } from '@/domain/scoring';
 import type { Meeting } from '@/domain/types';
 import { useAppData } from '@/providers/app-data-provider';
@@ -45,7 +46,7 @@ export default function ResultScreen() {
   const tone = positive ? colors.moss : neutral ? colors.amber : colors.wine;
   const moodBase = MOOD_CONFIG[meeting.mood].score;
   const multiplier = getDurationMultiplier(meeting.durationMinutes);
-  const modifier = meeting.reasonIds.reduce((sum, reasonId) => sum + REASON_MAP[reasonId].modifier, 0);
+  const modifier = meeting.reasonIds.reduce((sum, reasonId) => sum + (REASON_MAP[reasonId as keyof typeof REASON_MAP]?.modifier ?? 0), 0);
   const home = originPath(from);
 
   return (
@@ -74,6 +75,22 @@ export default function ResultScreen() {
         </View>
       </Card>
 
+      {answeredOutcomeCount(meeting) ? (
+        <Card style={styles.outcomeCard}>
+          <AppText variant="label" style={{ color: colors.inkSoft }}>Outcome clarity · does not affect the score</AppText>
+          {meeting.decisionStatus ? <OutcomeLine label="Decision made" value={OUTCOME_STATUS_LABELS[meeting.decisionStatus]} /> : null}
+          {meeting.ownershipStatus ? <OutcomeLine label="Ownership clear" value={OUTCOME_STATUS_LABELS[meeting.ownershipStatus]} /> : null}
+          {meeting.nextStepStatus ? <OutcomeLine label="Next step clear" value={OUTCOME_STATUS_LABELS[meeting.nextStepStatus]} /> : null}
+        </Card>
+      ) : null}
+
+      {meeting.intendedOutcome ? (
+        <Card style={styles.outcomeCard}>
+          <AppText variant="label" style={{ color: colors.inkSoft }}>Intended outcome · private</AppText>
+          <AppText variant="title">{meeting.intendedOutcome}</AppText>
+        </Card>
+      ) : null}
+
       <Card style={[styles.coachCard, { borderColor: tone }]}>
         <AppText variant="label" style={{ color: tone }}>One thing to try</AppText>
         <AppText variant="title">{getMeetingSuggestion(meeting)}</AppText>
@@ -93,6 +110,10 @@ function MathPart({ value, label }: { value: string; label: string }) {
   return <View style={styles.mathPart}><AppText variant="title">{value}</AppText><AppText variant="small" style={{ color: colors.inkSoft }}>{label}</AppText></View>;
 }
 
+function OutcomeLine({ label, value }: { label: string; value: string }) {
+  return <View style={styles.outcomeLine}><AppText style={{ color: colors.inkSoft }}>{label}</AppText><AppText variant="title">{value}</AppText></View>;
+}
+
 const styles = StyleSheet.create({
   content: { alignItems: 'center', paddingTop: spacing.xl },
   doneMark: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', shadowColor: colors.orange, shadowOpacity: 0.45, shadowRadius: 18 },
@@ -100,6 +121,8 @@ const styles = StyleSheet.create({
   scoreOrb: { width: 258, height: 258, borderRadius: 129, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', gap: 3, shadowColor: colors.shadow, shadowOffset: { width: 0, height: 18 }, shadowOpacity: 0.35, shadowRadius: 30, elevation: 10, overflow: 'hidden' },
   orbGlow: { position: 'absolute', width: 120, height: 120, borderRadius: 60, opacity: 0.10, shadowOpacity: 0.9, shadowRadius: 55 },
   explainer: { width: '100%', gap: spacing.md },
+  outcomeCard: { width: '100%', gap: spacing.sm },
+  outcomeLine: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md },
   mathRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   mathPart: { alignItems: 'center' },
   coachCard: { width: '100%', gap: spacing.sm, borderWidth: 1.5, borderRadius: radius.md },

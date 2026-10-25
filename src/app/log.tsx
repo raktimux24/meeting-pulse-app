@@ -8,30 +8,42 @@ import { Controller, useForm, useWatch } from 'react-hook-form';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
-import { AppText, Button, LoadingState, NotFoundState, Pill, Screen, formatSigned } from '@/components/ui';
+import { AppText, Button, Card, LoadingState, NotFoundState, Pill, Screen, formatSigned } from '@/components/ui';
 import { MOOD_CONFIG, REASONS } from '@/domain/constants';
 import { catalogMeetingTypes } from '@/domain/meeting-types';
 import { defaultPeopleCount, lastPeopleByType, lastUsedDefaults, recentTitles } from '@/domain/defaults';
 import { mergeDateTimePart, type DateTimePart } from '@/domain/date-time';
 import { calculateImpactScore, getImpactLabel } from '@/domain/scoring';
-import { MOODS, type Meeting, type MeetingType, type Mood, type ReasonId } from '@/domain/types';
+import { OUTCOME_STATUS_LABELS } from '@/domain/outcomes';
+import { MOODS, type CustomReason, type Meeting, type MeetingType, type Mood, type OutcomeStatus } from '@/domain/types';
 import { meetingDetailsSchema, type MeetingDetailsInput } from '@/domain/validation';
 import { useAppData } from '@/providers/app-data-provider';
 import { colors, fonts, radius, spacing } from '@/theme/tokens';
 
 export default function LogMeetingScreen() {
-  const { id, from } = useLocalSearchParams<{ id?: string; from?: string }>();
-  const { create, update, getById, getAll, customMeetingTypes } = useAppData();
+  const params = useLocalSearchParams<{ id?: string | string[]; from?: string | string[]; pulseId?: string | string[]; calendarStart?: string | string[]; calendarDuration?: string | string[] }>();
+  const id = firstParam(params.id);
+  const from = firstParam(params.from);
+  const pulseId = firstParam(params.pulseId);
+  const calendarStart = firstParam(params.calendarStart);
+  const calendarDuration = firstParam(params.calendarDuration);
+  const { create, completeQuickPulse, update, getById, getAll, getQuickPulse, customMeetingTypes, customReasons } = useAppData();
   const [step, setStep] = useState<1 | 2>(1);
   const [occurredAt, setOccurredAt] = useState(new Date());
   const [showPicker, setShowPicker] = useState<'date' | 'time' | null>(null);
   const [mood, setMood] = useState<Mood | null>(null);
-  const [reasonIds, setReasonIds] = useState<ReasonId[]>([]);
+  const [reasonIds, setReasonIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
-  const [loadingEdit, setLoadingEdit] = useState(Boolean(id));
+  const [loadingEdit, setLoadingEdit] = useState(Boolean(id || pulseId));
   const [missing, setMissing] = useState(false);
   const [showWhen, setShowWhen] = useState(false);
   const [showNote, setShowNote] = useState(false);
+  const [showOutcomeCheck, setShowOutcomeCheck] = useState(false);
+  const [decisionStatus, setDecisionStatus] = useState<OutcomeStatus | null>(null);
+  const [ownershipStatus, setOwnershipStatus] = useState<OutcomeStatus | null>(null);
+  const [nextStepStatus, setNextStepStatus] = useState<OutcomeStatus | null>(null);
+  const [intendedOutcome, setIntendedOutcome] = useState('');
+  const [showIntendedOutcome, setShowIntendedOutcome] = useState(false);
   const [history, setHistory] = useState<Meeting[]>([]);
 
   const { control, handleSubmit, reset, setValue, trigger, formState: { errors } } = useForm<MeetingDetailsInput>({
@@ -44,12 +56,16 @@ export default function LogMeetingScreen() {
       setHistory(meetings);
       if (id) return;
       const last = lastUsedDefaults(meetings);
-      if (!last) return;
-      setValue('meetingType', last.meetingType);
-      setValue('durationMinutes', last.durationMinutes);
-      setValue('peopleCount', defaultPeopleCount(last.meetingType, lastPeopleByType(meetings)));
+      if (last) {
+        setValue('meetingType', last.meetingType);
+        setValue('durationMinutes', last.durationMinutes);
+        setValue('peopleCount', defaultPeopleCount(last.meetingType, lastPeopleByType(meetings)));
+      }
+      const suggestedDuration = Number(calendarDuration);
+      if (Number.isFinite(suggestedDuration) && suggestedDuration >= 1 && suggestedDuration <= 720) setValue('durationMinutes', suggestedDuration);
+      if (calendarStart && !Number.isNaN(new Date(calendarStart).getTime())) setOccurredAt(new Date(calendarStart));
     });
-  }, [getAll, id, setValue]);
+  }, [calendarDuration, calendarStart, getAll, id, setValue]);
 
   useEffect(() => {
     if (!id) return;
@@ -62,9 +78,28 @@ export default function LogMeetingScreen() {
       setOccurredAt(new Date(meeting.occurredAt));
       setMood(meeting.mood);
       setReasonIds(meeting.reasonIds);
+      setDecisionStatus(meeting.decisionStatus);
+      setOwnershipStatus(meeting.ownershipStatus);
+      setNextStepStatus(meeting.nextStepStatus);
+      setIntendedOutcome(meeting.intendedOutcome ?? '');
+      setShowIntendedOutcome(Boolean(meeting.intendedOutcome));
+      setShowOutcomeCheck(Boolean(meeting.decisionStatus || meeting.ownershipStatus || meeting.nextStepStatus));
       setShowNote(Boolean(meeting.note));
     }).finally(() => setLoadingEdit(false));
   }, [getById, id, reset]);
+
+  useEffect(() => {
+    if (!pulseId || id) return;
+    getQuickPulse(pulseId).then((pulse) => {
+      if (!pulse) {
+        setMissing(true);
+        return;
+      }
+      setOccurredAt(new Date(pulse.occurredAt));
+      setMood(pulse.mood);
+      setReasonIds(pulse.reasonId ? [pulse.reasonId] : []);
+    }).finally(() => setLoadingEdit(false));
+  }, [getQuickPulse, id, pulseId]);
 
   const duration = useWatch({ control, name: 'durationMinutes' });
   const peopleCount = useWatch({ control, name: 'peopleCount' });
@@ -78,8 +113,9 @@ export default function LogMeetingScreen() {
     if (await trigger()) setStep(2);
   };
 
-  const toggleReason = (reasonId: ReasonId) => {
+  const toggleReason = (reasonId: string) => {
     setReasonIds((current) => current.includes(reasonId) ? current.filter((item) => item !== reasonId) : [...current, reasonId]);
+    if (reasonId === 'no-decision' || reasonId === 'unclear-ownership') setShowOutcomeCheck(true);
   };
 
   const typeOptions = useMemo(() => catalogMeetingTypes(customMeetingTypes), [customMeetingTypes]);
@@ -93,8 +129,21 @@ export default function LogMeetingScreen() {
     if (!mood || saving) return;
     setSaving(true);
     try {
-      const input = { ...details, occurredAt: occurredAt.toISOString(), mood, reasonIds };
-      const meeting = id ? await update(id, input) : await create(input);
+      const input = {
+        ...details,
+        occurredAt: occurredAt.toISOString(),
+        mood,
+        reasonIds,
+        decisionStatus,
+        ownershipStatus,
+        nextStepStatus,
+        intendedOutcome: intendedOutcome.trim() || null,
+      };
+      const meeting = id
+        ? await update(id, input)
+        : pulseId
+          ? await completeQuickPulse(pulseId, input)
+          : await create(input);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       if (!meeting) {
         Alert.alert('Could not save', 'That reflection is no longer on this device.');
@@ -142,7 +191,7 @@ export default function LogMeetingScreen() {
           <View style={styles.form}>
             <Field label="Meeting name" error={errors.title?.message}>
               <Controller control={control} name="title" render={({ field: { value, onChange, onBlur } }) => (
-                <TextInput value={value} onChangeText={onChange} onBlur={onBlur} placeholder="e.g. Design review" placeholderTextColor={colors.lineDark} style={styles.input} autoFocus={!id} returnKeyType="done" />
+                <TextInput accessibilityLabel="Meeting name" value={value} onChangeText={onChange} onBlur={onBlur} placeholder="e.g. Design review" placeholderTextColor={colors.lineDark} style={styles.input} autoFocus={!id} returnKeyType="done" />
               )} />
               {titles.length ? (
                 <View style={styles.pills}>
@@ -152,6 +201,25 @@ export default function LogMeetingScreen() {
                 </View>
               ) : null}
             </Field>
+
+            <Pressable accessibilityRole="button" accessibilityState={{ expanded: showIntendedOutcome }} onPress={() => setShowIntendedOutcome((value) => !value)} style={styles.disclosure}>
+              <View style={{ flex: 1, gap: 3 }}>
+                <AppText variant="title">Intended outcome · optional</AppText>
+                <AppText variant="small" style={{ color: colors.inkSoft }}>What must this meeting produce?</AppText>
+              </View>
+              <ChevronDown size={18} color={colors.inkSoft} style={{ transform: [{ rotate: showIntendedOutcome ? '180deg' : '0deg' }] }} />
+            </Pressable>
+            {showIntendedOutcome ? (
+              <TextInput
+                value={intendedOutcome}
+                onChangeText={setIntendedOutcome}
+                placeholder="e.g. Choose one launch direction"
+                placeholderTextColor={colors.lineDark}
+                style={styles.input}
+                maxLength={160}
+                accessibilityLabel="Intended meeting outcome"
+              />
+            ) : null}
 
             <Field label="Duration" error={errors.durationMinutes?.message}>
               <View style={styles.pills}>{[15, 30, 45, 60].map((minutes) => <Pill key={minutes} label={`${minutes} min`} selected={duration === minutes} onPress={() => setValue('durationMinutes', minutes, { shouldValidate: true })} />)}</View>
@@ -231,7 +299,7 @@ export default function LogMeetingScreen() {
             {showNote ? (
               <Field label="" error={errors.note?.message}>
                 <Controller control={control} name="note" render={({ field: { value, onChange, onBlur } }) => (
-                  <TextInput value={value} onChangeText={onChange} onBlur={onBlur} placeholder="Anything you want to remember…" placeholderTextColor={colors.lineDark} style={[styles.input, styles.note]} multiline textAlignVertical="top" />
+                  <TextInput accessibilityLabel="Private note" value={value} onChangeText={onChange} onBlur={onBlur} placeholder="Anything you want to remember…" placeholderTextColor={colors.lineDark} style={[styles.input, styles.note]} multiline textAlignVertical="top" />
                 )} />
               </Field>
             ) : null}
@@ -277,8 +345,25 @@ export default function LogMeetingScreen() {
               </View>
             </View>
 
-            <ReasonGroup title="What worked?" reasonIds={reasonIds} sentiment="positive" onToggle={toggleReason} />
-            <ReasonGroup title="What got in the way?" reasonIds={reasonIds} sentiment="negative" onToggle={toggleReason} />
+            <ReasonGroup title="What worked?" reasonIds={reasonIds} sentiment="positive" customReasons={customReasons} onToggle={toggleReason} />
+            <ReasonGroup title="What got in the way?" reasonIds={reasonIds} sentiment="negative" customReasons={customReasons} onToggle={toggleReason} />
+
+            <Pressable accessibilityRole="button" accessibilityState={{ expanded: showOutcomeCheck }} onPress={() => setShowOutcomeCheck((value) => !value)} style={styles.disclosure}>
+              <View style={{ flex: 1, gap: 3 }}>
+                <AppText variant="title">Outcome check · optional</AppText>
+                <AppText variant="small" style={{ color: colors.inkSoft }}>A separate signal. It does not change your impact score.</AppText>
+              </View>
+              <ChevronDown size={18} color={colors.inkSoft} style={{ transform: [{ rotate: showOutcomeCheck ? '180deg' : '0deg' }] }} />
+            </Pressable>
+            {showOutcomeCheck ? (
+              <Card style={styles.outcomeCard}>
+                <OutcomeQuestion label="Was a decision made?" value={decisionStatus} onChange={setDecisionStatus} />
+                {decisionStatus === 'yes' && reasonIds.includes('no-decision') ? <AppText variant="small" style={styles.warning}>You also selected “No decision.” Keep the answer that best reflects the meeting.</AppText> : null}
+                <OutcomeQuestion label="Is ownership clear?" value={ownershipStatus} onChange={setOwnershipStatus} />
+                {ownershipStatus === 'yes' && reasonIds.includes('unclear-ownership') ? <AppText variant="small" style={styles.warning}>You also selected “Unclear ownership.” Keep the answer that best reflects the meeting.</AppText> : null}
+                <OutcomeQuestion label="Is the next step clear?" value={nextStepStatus} onChange={setNextStepStatus} />
+              </Card>
+            ) : null}
 
             <View style={styles.actions}>
               <Button label="Back" variant="secondary" onPress={() => setStep(1)} icon={<ChevronLeft size={19} color={colors.ink} />} style={{ flex: 1 }} />
@@ -291,15 +376,46 @@ export default function LogMeetingScreen() {
   );
 }
 
+function firstParam(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return <View style={styles.field}>{label ? <AppText variant="label" style={{ color: colors.inkSoft }}>{label}</AppText> : null}{children}{error ? <AppText variant="small" style={{ color: colors.wine }}>{error}</AppText> : null}</View>;
 }
 
-function ReasonGroup({ title, reasonIds, sentiment, onToggle }: { title: string; reasonIds: ReasonId[]; sentiment: 'positive' | 'negative'; onToggle: (id: ReasonId) => void }) {
+function ReasonGroup({ title, reasonIds, sentiment, customReasons, onToggle }: { title: string; reasonIds: string[]; sentiment: 'positive' | 'negative'; customReasons: CustomReason[]; onToggle: (id: string) => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const reasons = [
+    ...REASONS.filter((reason) => reason.sentiment === sentiment),
+    ...customReasons.filter((reason) => reason.active !== false && reason.sentiment === sentiment).map((reason) => ({ ...reason, modifier: 0 })),
+  ];
+  const visibleReasons = expanded || reasons.length <= 6 ? reasons : reasons.slice(0, 6);
   return (
     <View style={styles.question}>
       <AppText variant="title">{title}</AppText>
-      <View style={styles.pills}>{REASONS.filter((reason) => reason.sentiment === sentiment).map((reason) => <Pill key={reason.id} label={reason.label} tone={sentiment} selected={reasonIds.includes(reason.id)} onPress={() => onToggle(reason.id)} />)}</View>
+      <View style={styles.pills}>{visibleReasons.map((reason) => <Pill key={reason.id} label={reason.label} tone={sentiment} selected={reasonIds.includes(reason.id)} onPress={() => onToggle(reason.id)} />)}</View>
+      {reasons.length > 6 ? <Button label={expanded ? 'Show fewer reasons' : `Show all ${reasons.length} reasons`} variant="ghost" onPress={() => setExpanded((value) => !value)} /> : null}
+    </View>
+  );
+}
+
+function OutcomeQuestion({ label, value, onChange }: { label: string; value: OutcomeStatus | null; onChange: (value: OutcomeStatus | null) => void }) {
+  const options: OutcomeStatus[] = ['yes', 'not-needed', 'no'];
+  return (
+    <View style={styles.question}>
+      <AppText variant="title">{label}</AppText>
+      <View style={styles.pills}>
+        {options.map((option) => (
+          <Pill
+            key={option}
+            label={OUTCOME_STATUS_LABELS[option]}
+            selected={value === option}
+            tone={option === 'no' ? 'negative' : option === 'yes' ? 'positive' : 'default'}
+            onPress={() => onChange(value === option ? null : option)}
+          />
+        ))}
+      </View>
     </View>
   );
 }
@@ -311,6 +427,8 @@ const styles = StyleSheet.create({
   progressActive: { flex: 1, height: 5, borderRadius: 3, backgroundColor: colors.orange, shadowColor: colors.orange, shadowOpacity: 0.7, shadowRadius: 8 },
   form: { gap: spacing.xl },
   field: { gap: spacing.sm },
+  outcomeCard: { gap: spacing.lg, borderColor: colors.lineDark },
+  warning: { color: colors.wine, marginTop: -spacing.md },
   input: { minHeight: 58, borderWidth: 1, borderColor: colors.lineDark, borderRadius: radius.md, backgroundColor: colors.surfaceGlass, paddingHorizontal: spacing.md, color: colors.ink, fontFamily: fonts.body, fontSize: 16 },
   note: { minHeight: 104, paddingTop: spacing.md },
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

@@ -11,12 +11,15 @@ import { useAppData } from '@/providers/app-data-provider';
 import { colors, fonts, radius, spacing } from '@/theme/tokens';
 
 export function MeetingCard({ meeting, onPress }: { meeting: Meeting; onPress: () => void }) {
-  const { customMeetingTypes } = useAppData();
+  const { customMeetingTypes, customReasons } = useAppData();
   const positive = meeting.impactScore > 0;
   const neutral = meeting.impactScore === 0;
   const accent = positive ? colors.moss : neutral ? colors.amber : colors.wine;
   const background = positive ? colors.mossSoft : neutral ? colors.amberSoft : colors.wineSoft;
-  const primaryReason = meeting.reasonIds[0] ? REASON_MAP[meeting.reasonIds[0]].label : MOOD_CONFIG[meeting.mood].short;
+  const reasonId = meeting.reasonIds[0];
+  const primaryReason = reasonId
+    ? REASON_MAP[reasonId as keyof typeof REASON_MAP]?.label ?? customReasons.find((reason) => reason.id === reasonId)?.label ?? 'Custom reason'
+    : MOOD_CONFIG[meeting.mood].short;
 
   return (
     <Pressable

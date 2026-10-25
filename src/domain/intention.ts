@@ -1,6 +1,6 @@
 import { isSameWeek } from 'date-fns';
 
-import type { WeeklyIntention } from './types';
+import { EXPERIMENT_RESULTS, type ExperimentResult, type WeeklyIntention } from './types';
 
 export function parseIntention(raw: string | null): WeeklyIntention | null {
   if (!raw) return null;
@@ -11,6 +11,10 @@ export function parseIntention(raw: string | null): WeeklyIntention | null {
       text: parsed.text,
       weekStartIso: parsed.weekStartIso,
       tried: Boolean(parsed.tried),
+      sourceInsightId: typeof parsed.sourceInsightId === 'string' ? parsed.sourceInsightId : undefined,
+      experimentTemplateId: typeof parsed.experimentTemplateId === 'string' ? parsed.experimentTemplateId : undefined,
+      result: EXPERIMENT_RESULTS.includes(parsed.result as ExperimentResult) ? parsed.result as ExperimentResult : undefined,
+      reviewedAt: typeof parsed.reviewedAt === 'string' ? parsed.reviewedAt : undefined,
     };
   } catch {
     return null;

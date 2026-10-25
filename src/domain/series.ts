@@ -19,13 +19,26 @@ export function getRecurringSeries(meetings: Meeting[], minimumCount = 3): Serie
   });
 
   return [...groups.entries()]
-    .map(([key, items]) => ({
-      key,
-      title: items[0]?.title.trim() ?? key,
-      meetingType: items[0]?.meetingType ?? 'other',
-      count: items.length,
-      average: Math.round(average(items.map((item) => item.impactScore)) * 10) / 10,
-    }))
+    .map(([key, items]) => {
+      const ordered = [...items].sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime());
+      const split = Math.max(1, Math.floor(ordered.length / 2));
+      const previous = ordered.slice(0, split);
+      const recent = ordered.slice(split);
+      const recentAverage = Math.round(average(recent.map((item) => item.impactScore)) * 10) / 10;
+      const previousAverage = previous.length && recent.length
+        ? Math.round(average(previous.map((item) => item.impactScore)) * 10) / 10
+        : null;
+      return {
+        key,
+        title: items[0]?.title.trim() ?? key,
+        meetingType: items[0]?.meetingType ?? 'other',
+        count: items.length,
+        average: Math.round(average(items.map((item) => item.impactScore)) * 10) / 10,
+        recentAverage,
+        previousAverage,
+        trend: previousAverage == null ? null : Math.round((recentAverage - previousAverage) * 10) / 10,
+      };
+    })
     .filter((item) => item.count >= minimumCount)
     .sort((a, b) => a.average - b.average);
 }

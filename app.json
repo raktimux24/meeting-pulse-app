@@ -2,7 +2,7 @@
   "expo": {
     "name": "Meeting Pulse",
     "slug": "meeting-pulse",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "meetingpulse",
@@ -16,6 +16,9 @@
       },
       "entitlements": {
         "aps-environment": "production"
+      },
+      "runtimeVersion": {
+        "policy": "appVersion"
       }
     },
     "android": {
@@ -24,7 +27,11 @@
         "backgroundColor": "#070A12",
         "foregroundImage": "./assets/images/icon.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR"
+      ]
     },
     "web": {
       "output": "static",
@@ -51,6 +58,12 @@
       "@react-native-community/datetimepicker",
       "expo-document-picker",
       [
+        "expo-calendar",
+        {
+          "calendarPermission": "Allow Meeting Pulse to privately suggest meeting times from your calendar. Event titles and attendees are not stored."
+        }
+      ],
+      [
         "expo-notifications",
         {
           "color": "#FF7958",
@@ -69,6 +82,9 @@
         "projectId": "6ec45ba4-8c4c-4d4f-8970-36859a2ac595"
       }
     },
-    "owner": "meetslimshady07"
+    "owner": "meetslimshady07",
+    "updates": {
+      "url": "https://u.expo.dev/6ec45ba4-8c4c-4d4f-8970-36859a2ac595"
+    }
   }
 }

@@ -1,5 +1,5 @@
 import { MOOD_CONFIG, REASON_MAP } from './constants';
-import type { Meeting, Mood, ReasonId } from './types';
+import type { Meeting, Mood } from './types';
 
 export function getDurationMultiplier(durationMinutes: number): number {
   if (durationMinutes <= 15) return 1;
@@ -9,8 +9,8 @@ export function getDurationMultiplier(durationMinutes: number): number {
   return 2.5;
 }
 
-export function calculateImpactScore(mood: Mood, durationMinutes: number, reasonIds: ReasonId[]): number {
-  const reasonTotal = reasonIds.reduce((sum, id) => sum + REASON_MAP[id].modifier, 0);
+export function calculateImpactScore(mood: Mood, durationMinutes: number, reasonIds: string[]): number {
+  const reasonTotal = reasonIds.reduce((sum, id) => sum + (REASON_MAP[id as keyof typeof REASON_MAP]?.modifier ?? 0), 0);
   const raw = MOOD_CONFIG[mood].score * getDurationMultiplier(durationMinutes) + reasonTotal;
   return Math.round(raw * 10) / 10;
 }
@@ -46,6 +46,9 @@ export function getMeetingSuggestion(meeting: Pick<Meeting, 'durationMinutes' | 
   }
   if (meeting.reasonIds.includes('too-many-people')) {
     return 'Invite only the people needed to decide; share the outcome with everyone else.';
+  }
+  if (meeting.reasonIds.includes('not-needed-here')) {
+    return 'Ask for the decision or contribution you are needed for before accepting the next invite.';
   }
   if (meeting.reasonIds.includes('clear-outcome') || meeting.reasonIds.includes('fast-decision')) {
     return 'Keep this format: a visible outcome, the right people, and a crisp close.';

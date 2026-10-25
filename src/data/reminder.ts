@@ -56,6 +56,7 @@ export async function syncDailyReminder(prefs: ReminderPrefs): Promise<void> {
       title: 'Meeting Pulse',
       body: 'Take 20 seconds to capture today’s meetings.',
       sound: false,
+      data: { url: '/quick-pulse' },
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
@@ -84,6 +85,7 @@ export async function sendTestReminder(): Promise<void> {
       title: 'Meeting Pulse',
       body: 'This is a test of your end-of-day reminder.',
       sound: false,
+      data: { url: '/quick-pulse' },
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,

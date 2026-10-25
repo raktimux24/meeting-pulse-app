@@ -56,6 +56,56 @@ describe('export import', () => {
     expect(preview.skipped).toBe(2);
     expect(preview.meetings[0]?.title).toBe('Standup');
     expect(preview.customMeetingTypes).toEqual([]);
+    expect(preview.meetingBudget).toBeNull();
+    expect(preview.meetings[0]).toMatchObject({
+      decisionStatus: null,
+      ownershipStatus: null,
+      nextStepStatus: null,
+    });
+  });
+
+  it('imports outcome checks and normalizes private budget preferences', () => {
+    const preview = parseExportPayload({
+      meetings: [{
+        ...validMeeting,
+        decisionStatus: 'yes',
+        ownershipStatus: 'no',
+        nextStepStatus: 'not-needed',
+      }],
+      meetingBudget: {
+        enabled: true,
+        weeklyMinutes: 480,
+        maxCostMeetings: 3,
+        maxBlockMinutes: 90,
+        preferredBufferMinutes: 15,
+      },
+    });
+
+    expect(preview.meetings[0]).toMatchObject({
+      decisionStatus: 'yes',
+      ownershipStatus: 'no',
+      nextStepStatus: 'not-needed',
+    });
+    expect(preview.meetingBudget).toEqual({
+      enabled: true,
+      weeklyMinutes: 480,
+      maxCostMeetings: 3,
+      maxBlockMinutes: 90,
+      preferredBufferMinutes: 15,
+    });
+  });
+
+  it('imports intended outcomes, custom reasons, and pending Quick Pulses', () => {
+    const preview = parseExportPayload({
+      meetings: [{ ...validMeeting, intendedOutcome: 'Choose one direction', reasonIds: ['custom-good-context'] }],
+      customReasons: [{ id: 'custom-good-context', label: 'Good context', sentiment: 'positive' }],
+      quickPulses: [{ occurredAt: '2026-10-25T09:00:00.000Z', mood: 'clear', reasonId: 'custom-good-context' }],
+    });
+
+    expect(preview.meetings[0]?.intendedOutcome).toBe('Choose one direction');
+    expect(preview.meetings[0]?.reasonIds).toEqual(['custom-good-context']);
+    expect(preview.customReasons).toHaveLength(1);
+    expect(preview.quickPulses).toEqual([{ occurredAt: '2026-10-25T09:00:00.000Z', mood: 'clear', reasonId: 'custom-good-context' }]);
   });
 
   it('accepts a custom meeting type and imported type catalog', () => {

@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
   buttonTextPrimary: { color: colors.white },
   buttonTextDanger: { color: colors.wine },
   disabled: { opacity: 0.4 },
-  pill: { minHeight: 40, borderRadius: radius.round, borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', paddingHorizontal: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(17,24,39,0.72)' },
+  pill: { minHeight: 44, borderRadius: radius.round, borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', paddingHorizontal: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(17,24,39,0.72)' },
   pillPositive: { backgroundColor: colors.mossSoft, borderColor: 'rgba(114,230,192,0.30)' },
   pillNegative: { backgroundColor: colors.wineSoft, borderColor: 'rgba(255,113,133,0.30)' },
   pillSelected: { backgroundColor: colors.orange, borderColor: colors.orange },

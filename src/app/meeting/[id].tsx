@@ -8,6 +8,7 @@ import { AppText, Button, Card, LoadingState, NotFoundState, formatSigned, Gradi
 import { MOOD_CONFIG, REASON_MAP } from '@/domain/constants';
 import { meetingTypeLabel } from '@/domain/meeting-types';
 import { originPath } from '@/domain/format';
+import { answeredOutcomeCount, OUTCOME_STATUS_LABELS } from '@/domain/outcomes';
 import { getImpactLabel, getMeetingSuggestion } from '@/domain/scoring';
 import type { Meeting } from '@/domain/types';
 import { useAppData } from '@/providers/app-data-provider';
@@ -15,7 +16,7 @@ import { colors, gradients, spacing } from '@/theme/tokens';
 
 export default function MeetingDetailScreen() {
   const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
-  const { getById, remove, revision, customMeetingTypes } = useAppData();
+  const { getById, remove, revision, customMeetingTypes, customReasons } = useAppData();
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [missing, setMissing] = useState(!id);
 
@@ -73,8 +74,22 @@ export default function MeetingDetailScreen() {
 
       <View style={styles.section}>
         <AppText variant="label" style={{ color: colors.inkSoft }}>What shaped it</AppText>
-        <View style={styles.pills}>{meeting.reasonIds.length ? meeting.reasonIds.map((reasonId) => <Pill key={reasonId} label={REASON_MAP[reasonId].label} tone={REASON_MAP[reasonId].sentiment} />) : <AppText style={{ color: colors.inkSoft }}>No reasons selected.</AppText>}</View>
+        <View style={styles.pills}>{meeting.reasonIds.length ? meeting.reasonIds.map((reasonId) => {
+          const reason = REASON_MAP[reasonId as keyof typeof REASON_MAP] ?? customReasons.find((item) => item.id === reasonId);
+          return <Pill key={reasonId} label={reason?.label ?? 'Custom reason'} tone={reason?.sentiment ?? 'default'} />;
+        }) : <AppText style={{ color: colors.inkSoft }}>No reasons selected.</AppText>}</View>
       </View>
+
+      {meeting.intendedOutcome ? <Card style={styles.section}><AppText variant="label" style={{ color: colors.inkSoft }}>Intended outcome · private</AppText><AppText variant="title">{meeting.intendedOutcome}</AppText></Card> : null}
+
+      {answeredOutcomeCount(meeting) ? (
+        <Card style={styles.section}>
+          <AppText variant="label" style={{ color: colors.inkSoft }}>Outcome clarity · separate from the score</AppText>
+          {meeting.decisionStatus ? <Detail label="Decision made" value={OUTCOME_STATUS_LABELS[meeting.decisionStatus]} /> : null}
+          {meeting.ownershipStatus ? <Detail label="Ownership clear" value={OUTCOME_STATUS_LABELS[meeting.ownershipStatus]} /> : null}
+          {meeting.nextStepStatus ? <Detail label="Next step clear" value={OUTCOME_STATUS_LABELS[meeting.nextStepStatus]} /> : null}
+        </Card>
+      ) : null}
 
       {meeting.note ? <Card style={styles.section}><AppText variant="label" style={{ color: colors.inkSoft }}>Private note</AppText><AppText>{meeting.note}</AppText></Card> : null}
 

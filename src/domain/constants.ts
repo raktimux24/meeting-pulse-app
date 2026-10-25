@@ -41,6 +41,7 @@ export const REASONS: Reason[] = [
   { id: 'dominated-by-one-person', label: 'Dominated by one person', modifier: -1, sentiment: 'negative' },
   { id: 'too-long', label: 'Too long', modifier: -1, sentiment: 'negative' },
   { id: 'last-minute-invite', label: 'Last-minute invite', modifier: -1, sentiment: 'negative' },
+  { id: 'not-needed-here', label: 'I wasn’t needed', modifier: -1, sentiment: 'negative' },
 ];
 
 export const REASON_MAP = Object.fromEntries(REASONS.map((reason) => [reason.id, reason])) as Record<
