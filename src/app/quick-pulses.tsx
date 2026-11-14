@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Trash2 } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
@@ -13,6 +13,9 @@ import { colors, spacing } from '@/theme/tokens';
 export default function QuickPulsesScreen() {
   const { getQuickPulses, removeQuickPulse, revision, customReasons } = useAppData();
   const [pulses, setPulses] = useState<QuickPulse[] | null>(null);
+  // Set when a mood button on an after-meeting check-in saved a pulse.
+  const { saved } = useLocalSearchParams<{ saved?: string }>();
+  const savedMood = saved && saved in MOOD_CONFIG ? MOOD_CONFIG[saved as keyof typeof MOOD_CONFIG].label : null;
 
   useEffect(() => { getQuickPulses().then(setPulses); }, [getQuickPulses, revision]);
 
@@ -34,6 +37,12 @@ export default function QuickPulsesScreen() {
         <AppText variant="display">Pending Quick Pulses</AppText>
         <AppText style={{ color: colors.inkSoft }}>These are private drafts. Complete one to add its signal to your history and insights.</AppText>
       </View>
+      {savedMood ? (
+        <Card style={styles.saved}>
+          <AppText variant="title">Saved: {savedMood}</AppText>
+          <AppText style={{ color: colors.inkSoft }}>Your check-in is safe. Add a name and reasons now, or later when you have space.</AppText>
+        </Card>
+      ) : null}
       {pulses.length ? pulses.map((pulse) => {
         const reason = pulse.reasonId
           ? REASON_MAP[pulse.reasonId as keyof typeof REASON_MAP] ?? customReasons.find((item) => item.id === pulse.reasonId)
@@ -43,7 +52,7 @@ export default function QuickPulsesScreen() {
             <View style={{ flex: 1, gap: 4 }}>
               <AppText variant="label" style={{ color: colors.amber }}>{format(new Date(pulse.occurredAt), 'EEE, MMM d · h:mm a')}</AppText>
               <AppText variant="title">{MOOD_CONFIG[pulse.mood].label}</AppText>
-              <AppText style={{ color: colors.inkSoft }}>{reason?.label ?? 'No reason selected'}</AppText>
+              <AppText style={{ color: colors.inkSoft }}>{reason?.label ?? 'No reason selected'}{pulse.durationMinutes ? ` · ${pulse.durationMinutes} min` : ''}</AppText>
             </View>
             <View style={styles.actions}>
               <Button label="Complete reflection" variant="secondary" onPress={() => router.push({ pathname: '/log', params: { from: 'today', pulseId: pulse.id } })} />
@@ -61,5 +70,6 @@ export default function QuickPulsesScreen() {
 const styles = StyleSheet.create({
   intro: { gap: 6 },
   card: { gap: spacing.md },
+  saved: { gap: 4, backgroundColor: colors.mossSoft },
   actions: { gap: 8 },
 });

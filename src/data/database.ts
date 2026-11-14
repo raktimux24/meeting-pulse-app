@@ -5,7 +5,7 @@ import { calculateImpactScore } from '@/domain/scoring';
 import { INTENDED_OUTCOME_RESULTS, OUTCOME_STATUSES } from '@/domain/types';
 import type { IntendedOutcomeResult, Mood, OutcomeStatus } from '@/domain/types';
 
-const DATABASE_VERSION = 5;
+const DATABASE_VERSION = 6;
 
 type RecalcRow = {
   id: string;
@@ -112,6 +112,12 @@ export async function migrateDatabase(db: SQLiteDatabase) {
         await db.runAsync('UPDATE meetings SET impact_score = ? WHERE id = ?', score, row.id);
       }
     });
+  }
+
+  if (currentVersion < 6) {
+    // Quick Pulses from a calendar check-in already know how long the meeting was.
+    const columns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(quick_pulses)');
+    if (!columns.some((column) => column.name === 'duration_minutes')) await db.execAsync('ALTER TABLE quick_pulses ADD COLUMN duration_minutes INTEGER;');
   }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);

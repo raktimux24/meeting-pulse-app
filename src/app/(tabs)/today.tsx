@@ -1,5 +1,5 @@
 import { endOfDay, endOfWeek, format, startOfDay, startOfWeek } from 'date-fns';
-import { ArrowDownRight, ArrowRight, ArrowUpRight, Bolt, CalendarDays, ChartNoAxesCombined, ChevronDown, ChevronRight, ChevronUp, Plus, Settings2 } from 'lucide-react-native';
+import { ArrowDownRight, ArrowRight, ArrowUpRight, BellRing, Bolt, CalendarDays, CalendarRange, ChartNoAxesCombined, ChevronDown, ChevronRight, ChevronUp, Plus, Settings2 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
@@ -87,9 +87,21 @@ export default function TodayScreen() {
               icon={<CalendarDays size={19} color={colors.orange} />}
               onPress={() => router.push('/calendar-assist')}
             />
+            <FeatureGuidePill
+              title="After-meeting check-ins"
+              subtitle="Settings · one tap as a meeting ends"
+              icon={<BellRing size={19} color={colors.orange} />}
+              onPress={() => router.push('/settings')}
+            />
+            <FeatureGuidePill
+              title="Month in pixels"
+              subtitle="Quarterly trends · outcome hit rate"
+              icon={<CalendarRange size={19} color={colors.orange} />}
+              onPress={() => router.push('/trends')}
+            />
           </View>
         ) : (
-          <AppText variant="small" style={{ color: colors.inkSoft }}>Patterns and action templates live in Insights. Guardrails, custom reasons, reminders, and Calendar Assist live in Settings.</AppText>
+          <AppText variant="small" style={{ color: colors.inkSoft }}>Patterns, verdicts and the month view live in Insights. Check-ins, Apple Health, guardrails, reminders and Calendar Assist live in Settings.</AppText>
         )}
       </Card>
 
@@ -138,7 +150,7 @@ export default function TodayScreen() {
           <View style={{ flex: 1, gap: 4 }}>
             <AppText variant="label" style={{ color: colors.amber }}>Finish later</AppText>
             <AppText variant="title">{quickPulses.length} Quick Pulse{quickPulses.length === 1 ? '' : 's'} waiting</AppText>
-            <AppText style={{ color: colors.inkSoft }}>Add a name and duration before these signals enter your score and insights.</AppText>
+            <AppText style={{ color: colors.inkSoft }}>Add the meeting details before these signals enter your score and insights.</AppText>
           </View>
           <Button label="Review Quick Pulses" variant="secondary" onPress={() => router.push('/quick-pulses')} />
         </Card>

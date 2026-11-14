@@ -64,14 +64,15 @@ export default function LogMeetingScreen() {
       const last = lastUsedDefaults(meetings);
       if (last) {
         setValue('meetingType', last.meetingType);
-        setValue('durationMinutes', last.durationMinutes);
+        // A Quick Pulse from a calendar check-in brings its own duration (set below).
+        if (!pulseId) setValue('durationMinutes', last.durationMinutes);
         setValue('peopleCount', defaultPeopleCount(last.meetingType, lastPeopleByType(meetings)));
       }
       const suggestedDuration = Number(calendarDuration);
       if (Number.isFinite(suggestedDuration) && suggestedDuration >= 1 && suggestedDuration <= 720) setValue('durationMinutes', suggestedDuration);
       if (calendarStart && !Number.isNaN(new Date(calendarStart).getTime())) setOccurredAt(new Date(calendarStart));
     });
-  }, [calendarDuration, calendarStart, getAll, id, setValue]);
+  }, [calendarDuration, calendarStart, getAll, id, pulseId, setValue]);
 
   useEffect(() => {
     if (!id) return;
@@ -105,8 +106,9 @@ export default function LogMeetingScreen() {
       setOccurredAt(new Date(pulse.occurredAt));
       setMood(pulse.mood);
       setReasonIds(pulse.reasonId ? [pulse.reasonId] : []);
+      if (pulse.durationMinutes) setValue('durationMinutes', pulse.durationMinutes);
     }).finally(() => setLoadingEdit(false));
-  }, [getQuickPulse, id, pulseId]);
+  }, [getQuickPulse, id, pulseId, setValue]);
 
   const duration = useWatch({ control, name: 'durationMinutes' });
   const peopleCount = useWatch({ control, name: 'peopleCount' });

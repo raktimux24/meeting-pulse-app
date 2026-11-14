@@ -106,6 +106,8 @@ export type QuickPulse = {
   occurredAt: string;
   mood: Mood;
   reasonId: string | null;
+  /** Known when the pulse came from a calendar check-in; otherwise null. */
+  durationMinutes: number | null;
   createdAt: string;
 };
 
@@ -181,6 +183,13 @@ export type ReminderPrefs = {
   enabled: boolean;
   hour: number;
   minute: number;
+};
+
+/** End-of-meeting check-ins planned from calendar times. */
+export type NudgePrefs = {
+  enabled: boolean;
+  /** Minutes after the meeting ends. */
+  delayMinutes: number;
 };
 
 export type MeetingBudgetPrefs = {

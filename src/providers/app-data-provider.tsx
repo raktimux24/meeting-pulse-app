@@ -1,7 +1,11 @@
 import { useSQLiteContext } from 'expo-sqlite';
 import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
+import { saveMoodToHealth } from '@/data/health';
+import { syncNudges } from '@/data/nudges';
 import { reminderSupported, syncDailyReminder } from '@/data/reminder';
+import { updatePulseWidget, widgetPropsFor } from '@/data/widget-sync';
+import { DEFAULT_NUDGES, parseNudgePrefs } from '@/domain/nudges';
 import { parseCustomMeetingTypes } from '@/domain/meeting-types';
 import { parseCustomReasons } from '@/domain/custom-reasons';
 import { parseSeriesReviews } from '@/domain/series-reviews';
@@ -27,7 +31,7 @@ import {
   updateMeeting,
 } from '@/data/repository';
 import { intentionForWeek, parseIntention } from '@/domain/intention';
-import type { CustomMeetingType, CustomReason, ExperimentResult, Meeting, MeetingBudgetPrefs, MeetingInput, Mood, QuickPulse, ReminderPrefs, SeriesReview, WeeklyIntention } from '@/domain/types';
+import type { CustomMeetingType, CustomReason, ExperimentResult, Meeting, MeetingBudgetPrefs, MeetingInput, Mood, NudgePrefs, QuickPulse, ReminderPrefs, SeriesReview, WeeklyIntention } from '@/domain/types';
 
 type AppDataContextValue = {
   ready: boolean;
@@ -37,6 +41,8 @@ type AppDataContextValue = {
   pendingUndo: Meeting | null;
   intention: WeeklyIntention | null;
   reminder: ReminderPrefs;
+  nudges: NudgePrefs;
+  healthSync: boolean;
   meetingBudget: MeetingBudgetPrefs;
   customMeetingTypes: CustomMeetingType[];
   customReasons: CustomReason[];
@@ -55,7 +61,7 @@ type AppDataContextValue = {
   getRange: (start: Date, end: Date) => ReturnType<typeof getMeetingsByRange>;
   getAll: () => ReturnType<typeof getAllMeetings>;
   search: (query: string) => ReturnType<typeof searchMeetings>;
-  createQuickPulse: (input: { occurredAt: string; mood: Mood; reasonId: string | null }) => Promise<QuickPulse>;
+  createQuickPulse: (input: { occurredAt: string; mood: Mood; reasonId: string | null; durationMinutes?: number | null }) => Promise<QuickPulse>;
   getQuickPulse: (id: string) => Promise<QuickPulse | null>;
   getQuickPulses: () => Promise<QuickPulse[]>;
   removeQuickPulse: (id: string) => Promise<void>;
@@ -64,6 +70,10 @@ type AppDataContextValue = {
   reviewIntention: (result: ExperimentResult) => Promise<void>;
   clearIntention: () => Promise<void>;
   saveReminder: (prefs: ReminderPrefs) => Promise<void>;
+  saveNudges: (prefs: NudgePrefs) => Promise<number>;
+  /** Re-plans after-meeting check-ins from the calendar. Safe to call often. */
+  refreshNudges: () => Promise<number>;
+  saveHealthSync: (enabled: boolean) => Promise<void>;
   saveMeetingBudget: (prefs: MeetingBudgetPrefs) => Promise<void>;
   saveCustomMeetingTypes: (types: CustomMeetingType[]) => Promise<void>;
   saveCustomReasons: (reasons: CustomReason[]) => Promise<void>;
@@ -81,6 +91,8 @@ export function AppDataProvider({ children }: PropsWithChildren) {
   const [pendingUndo, setPendingUndo] = useState<Meeting | null>(null);
   const [intention, setIntention] = useState<WeeklyIntention | null>(null);
   const [reminder, setReminder] = useState<ReminderPrefs>(DEFAULT_REMINDER);
+  const [nudges, setNudges] = useState<NudgePrefs>(DEFAULT_NUDGES);
+  const [healthSync, setHealthSync] = useState(false);
   const [meetingBudget, setMeetingBudget] = useState<MeetingBudgetPrefs>(DEFAULT_MEETING_BUDGET);
   const [customMeetingTypes, setCustomMeetingTypes] = useState<CustomMeetingType[]>([]);
   const [customReasons, setCustomReasons] = useState<CustomReason[]>([]);
@@ -96,8 +108,10 @@ export function AppDataProvider({ children }: PropsWithChildren) {
       getSetting(db, 'meeting_budget'),
       getSetting(db, 'custom_reasons'),
       getSetting(db, 'series_reviews'),
+      getSetting(db, 'meeting_nudges'),
+      getSetting(db, 'health_sync'),
     ])
-      .then(async ([onboarding, weekStart, intentionValue, reminderValue, customTypesValue, meetingBudgetValue, customReasonsValue, seriesReviewsValue]) => {
+      .then(async ([onboarding, weekStart, intentionValue, reminderValue, customTypesValue, meetingBudgetValue, customReasonsValue, seriesReviewsValue, nudgesValue, healthValue]) => {
         setOnboardingComplete(onboarding === 'true');
         setWeekStartsOn(weekStart === '0' ? 0 : 1);
         setIntention(parseIntention(intentionValue));
@@ -107,14 +121,34 @@ export function AppDataProvider({ children }: PropsWithChildren) {
         setMeetingBudget(parseMeetingBudget(meetingBudgetValue));
         setCustomReasons(parseCustomReasons(customReasonsValue));
         setSeriesReviews(parseSeriesReviews(seriesReviewsValue));
+        const nextNudges = parseNudgePrefs(nudgesValue);
+        setNudges(nextNudges);
+        setHealthSync(healthValue === 'true');
         if (nextReminder.enabled && reminderSupported()) {
           await syncDailyReminder(nextReminder).catch(() => undefined);
         }
+        if (nextNudges.enabled) void syncNudges(nextNudges).catch(() => undefined);
       })
       .finally(() => setReady(true));
   }, [db]);
 
   const bump = useCallback(() => setRevision((value) => value + 1), []);
+
+  // Keep the home screen and Lock Screen widget in step with today's meetings.
+  useEffect(() => {
+    if (!ready) return;
+    let cancelled = false;
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    Promise.all([getMeetingsByRange(db, start, new Date(start.getTime() + 86_400_000 - 1)), getAllQuickPulses(db)])
+      .then(([today, pulses]) => { if (!cancelled) updatePulseWidget(widgetPropsFor(today, pulses.length, now)); })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [db, ready, revision]);
+
+  const shareMood = useCallback((mood: Mood, occurredAt: string, durationMinutes?: number | null) => {
+    if (healthSync) void saveMoodToHealth(mood, occurredAt, durationMinutes);
+  }, [healthSync]);
 
   const persistIntention = useCallback(async (next: WeeklyIntention | null) => {
     if (next) await setSetting(db, 'weekly_intention', JSON.stringify(next));
@@ -131,6 +165,8 @@ export function AppDataProvider({ children }: PropsWithChildren) {
       pendingUndo,
       intention: intentionForWeek(intention, new Date(), weekStartsOn),
       reminder,
+      nudges,
+      healthSync,
       meetingBudget,
       customMeetingTypes,
       customReasons,
@@ -146,6 +182,7 @@ export function AppDataProvider({ children }: PropsWithChildren) {
       },
       create: async (input) => {
         const meeting = await createMeeting(db, input);
+        shareMood(meeting.mood, meeting.occurredAt, meeting.durationMinutes);
         bump();
         return meeting;
       },
@@ -180,6 +217,9 @@ export function AppDataProvider({ children }: PropsWithChildren) {
           setWeekStartsOn(1);
           setIntention(null);
           setReminder(DEFAULT_REMINDER);
+          setNudges(DEFAULT_NUDGES);
+          setHealthSync(false);
+          void syncNudges(DEFAULT_NUDGES).catch(() => undefined);
           setMeetingBudget(DEFAULT_MEETING_BUDGET);
           setCustomMeetingTypes([]);
           setCustomReasons([]);
@@ -199,6 +239,7 @@ export function AppDataProvider({ children }: PropsWithChildren) {
       search: (query) => searchMeetings(db, query),
       createQuickPulse: async (input) => {
         const pulse = await createQuickPulseRecord(db, input);
+        shareMood(pulse.mood, pulse.occurredAt, pulse.durationMinutes);
         bump();
         return pulse;
       },
@@ -233,6 +274,17 @@ export function AppDataProvider({ children }: PropsWithChildren) {
         await setSetting(db, 'daily_reminder', JSON.stringify(prefs));
         setReminder(prefs);
       },
+      saveNudges: async (prefs) => {
+        const count = await syncNudges(prefs);
+        await setSetting(db, 'meeting_nudges', JSON.stringify(prefs));
+        setNudges(prefs);
+        return count;
+      },
+      refreshNudges: () => syncNudges(nudges).catch(() => 0),
+      saveHealthSync: async (enabled) => {
+        await setSetting(db, 'health_sync', enabled ? 'true' : 'false');
+        setHealthSync(enabled);
+      },
       saveMeetingBudget: async (prefs) => {
         const next = parseMeetingBudget(JSON.stringify(prefs));
         await setSetting(db, 'meeting_budget', JSON.stringify(next));
@@ -254,7 +306,7 @@ export function AppDataProvider({ children }: PropsWithChildren) {
         setSeriesReviews(next);
       },
     }),
-    [bump, customMeetingTypes, customReasons, db, intention, meetingBudget, onboardingComplete, pendingUndo, persistIntention, ready, reminder, revision, seriesReviews, weekStartsOn],
+    [bump, customMeetingTypes, customReasons, db, healthSync, intention, meetingBudget, nudges, onboardingComplete, pendingUndo, persistIntention, ready, reminder, revision, seriesReviews, shareMood, weekStartsOn],
   );
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;

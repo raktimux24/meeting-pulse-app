@@ -4,10 +4,13 @@ import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
 import { SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
-import { Suspense, useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, Platform, StyleSheet, View } from 'react-native';
 
 import { migrateDatabase } from '@/data/database';
+import { addRouteRequestListener, consumePendingRoute } from '@/data/health';
+import { readNudgeResponse } from '@/data/nudges';
+import { moodFromAction } from '@/domain/nudges';
 import { AppDataProvider, useAppData } from '@/providers/app-data-provider';
 import { AnimatedSplash } from '@/components/animated-splash';
 import { StackHeader } from '@/components/stack-header';
@@ -59,6 +62,7 @@ export default function RootLayout() {
             <AppDataProvider>
               <ReadySignal onReady={markReady} />
               <NotificationRouteObserver />
+              <ForegroundObserver />
               <StatusBar style="light" />
               <Stack
               screenOptions={{
@@ -82,6 +86,7 @@ export default function RootLayout() {
                 <Stack.Screen name="settings" options={{ header: () => <StackHeader title="Settings" /> }} />
                 <Stack.Screen name="report" options={{ presentation: 'modal', header: () => <StackHeader title="Weekly report" modal /> }} />
                 <Stack.Screen name="team-experiment" options={{ presentation: 'modal', header: () => <StackHeader title="Team experiment" modal /> }} />
+                <Stack.Screen name="trends" options={{ header: () => <StackHeader title="Longer view" /> }} />
               </Stack>
             </AppDataProvider>
           </SQLiteProvider>
@@ -101,25 +106,73 @@ function ReadySignal({ onReady }: { onReady: () => void }) {
   return null;
 }
 
+/** Routes taps on reminders and after-meeting check-ins, including their mood buttons. */
 function NotificationRouteObserver() {
   const router = useRouter();
+  const { ready, createQuickPulse } = useAppData();
+  const handled = useRef(new Set<string>());
+
   useEffect(() => {
-    if (Platform.OS === 'web') return undefined;
-    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
-      const url = response.notification.request.content.data?.url;
-      if (url === '/quick-pulse') {
-        router.push('/quick-pulse');
-        void Notifications.clearLastNotificationResponseAsync();
+    if (Platform.OS === 'web' || !ready) return undefined;
+    const handle = async (response: Notifications.NotificationResponse | null) => {
+      if (!response) return;
+      const key = `${response.notification.request.identifier}:${response.actionIdentifier}:${response.notification.date}`;
+      if (handled.current.has(key)) return;
+      handled.current.add(key);
+      void Notifications.clearLastNotificationResponseAsync();
+
+      const nudge = readNudgeResponse(response);
+      if (nudge) {
+        const mood = moodFromAction(nudge.actionIdentifier);
+        if (mood) {
+          // One tap on a mood button saves a Quick Pulse for that meeting straight away.
+          await createQuickPulse({ occurredAt: nudge.startIso ?? new Date().toISOString(), mood, reasonId: null, durationMinutes: nudge.durationMinutes });
+          router.push({ pathname: '/quick-pulses', params: { saved: mood } });
+        } else {
+          router.push({ pathname: '/quick-pulse', params: { at: nudge.startIso ?? undefined, duration: nudge.durationMinutes ? String(nudge.durationMinutes) : undefined } });
+        }
+        return;
       }
-    });
-    void Notifications.getLastNotificationResponseAsync().then((response) => {
-      if (response?.notification.request.content.data?.url === '/quick-pulse') {
-        router.push('/quick-pulse');
-        void Notifications.clearLastNotificationResponseAsync();
-      }
-    });
+      if (response.notification.request.content.data?.url === '/quick-pulse') router.push('/quick-pulse');
+    };
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => { void handle(response); });
+    void Notifications.getLastNotificationResponseAsync().then((response) => handle(response));
     return () => subscription.remove();
-  }, [router]);
+  }, [createQuickPulse, ready, router]);
+  return null;
+}
+
+/**
+ * When the app comes forward: opens the screen a Siri or Shortcuts action asked for, and re-plans
+ * after-meeting check-ins (at most every ten minutes) so new calendar events are covered.
+ */
+function ForegroundObserver() {
+  const router = useRouter();
+  const { ready, onboardingComplete, refreshNudges } = useAppData();
+  const lastNudgeSync = useRef(0);
+
+  useEffect(() => {
+    if (Platform.OS === 'web' || !ready) return undefined;
+    const onActive = () => {
+      const route = consumePendingRoute();
+      if (route && onboardingComplete) router.push(route as never);
+      if (Date.now() - lastNudgeSync.current > 10 * 60_000) {
+        lastNudgeSync.current = Date.now();
+        void refreshNudges();
+      }
+    };
+    onActive();
+    const subscription = AppState.addEventListener('change', (state) => { if (state === 'active') onActive(); });
+    // Siri brings the app forward before the intent stores its route, so it also signals us directly.
+    const routeSubscription = addRouteRequestListener(() => {
+      const route = consumePendingRoute();
+      if (route && onboardingComplete) router.push(route as never);
+    });
+    return () => {
+      subscription.remove();
+      routeSubscription.remove();
+    };
+  }, [onboardingComplete, ready, refreshNudges, router]);
   return null;
 }
 

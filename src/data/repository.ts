@@ -271,36 +271,51 @@ export async function importMeetings(
   return inputs.length;
 }
 
-export async function createQuickPulse(db: SQLiteDatabase, input: Pick<QuickPulse, 'occurredAt' | 'mood' | 'reasonId'>): Promise<QuickPulse> {
+type QuickPulseRow = { id: string; occurred_at: string; mood: string; reason_id: string | null; duration_minutes?: number | null; created_at: string };
+
+function quickPulseFromRow(row: QuickPulseRow): QuickPulse {
+  return {
+    id: row.id,
+    occurredAt: row.occurred_at,
+    mood: row.mood as Mood,
+    reasonId: row.reason_id,
+    durationMinutes: typeof row.duration_minutes === 'number' ? row.duration_minutes : null,
+    createdAt: row.created_at,
+  };
+}
+
+export async function createQuickPulse(
+  db: SQLiteDatabase,
+  input: Pick<QuickPulse, 'occurredAt' | 'mood' | 'reasonId'> & { durationMinutes?: number | null },
+): Promise<QuickPulse> {
   const pulse: QuickPulse = {
-    ...input,
+    occurredAt: input.occurredAt,
+    mood: input.mood,
+    reasonId: input.reasonId,
+    durationMinutes: input.durationMinutes ?? null,
     id: `pulse_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
     createdAt: new Date().toISOString(),
   };
   await db.runAsync(
-    'INSERT INTO quick_pulses (id, occurred_at, mood, reason_id, created_at) VALUES (?, ?, ?, ?, ?)',
+    'INSERT INTO quick_pulses (id, occurred_at, mood, reason_id, duration_minutes, created_at) VALUES (?, ?, ?, ?, ?, ?)',
     pulse.id,
     pulse.occurredAt,
     pulse.mood,
     pulse.reasonId,
+    pulse.durationMinutes,
     pulse.createdAt,
   );
   return pulse;
 }
 
 export async function getQuickPulseById(db: SQLiteDatabase, id: string): Promise<QuickPulse | null> {
-  const row = await db.getFirstAsync<{ id: string; occurred_at: string; mood: string; reason_id: string | null; created_at: string }>(
-    'SELECT * FROM quick_pulses WHERE id = ?',
-    id,
-  );
-  return row ? { id: row.id, occurredAt: row.occurred_at, mood: row.mood as Mood, reasonId: row.reason_id, createdAt: row.created_at } : null;
+  const row = await db.getFirstAsync<QuickPulseRow>('SELECT * FROM quick_pulses WHERE id = ?', id);
+  return row ? quickPulseFromRow(row) : null;
 }
 
 export async function getAllQuickPulses(db: SQLiteDatabase): Promise<QuickPulse[]> {
-  const rows = await db.getAllAsync<{ id: string; occurred_at: string; mood: string; reason_id: string | null; created_at: string }>(
-    'SELECT * FROM quick_pulses ORDER BY occurred_at DESC',
-  );
-  return rows.map((row) => ({ id: row.id, occurredAt: row.occurred_at, mood: row.mood as Mood, reasonId: row.reason_id, createdAt: row.created_at }));
+  const rows = await db.getAllAsync<QuickPulseRow>('SELECT * FROM quick_pulses ORDER BY occurred_at DESC');
+  return rows.map(quickPulseFromRow);
 }
 
 export async function deleteQuickPulse(db: SQLiteDatabase, id: string): Promise<void> {

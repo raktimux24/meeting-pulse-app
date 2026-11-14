@@ -57,7 +57,7 @@ export function parseExportPayload(raw: unknown): ImportPreview {
   const quickPulses = (payload.data.quickPulses ?? []).flatMap((item) => {
     const parsed = quickPulseSchema.safeParse(item);
     if (!parsed.success || Number.isNaN(new Date(parsed.data.occurredAt).getTime())) return [];
-    return [{ occurredAt: new Date(parsed.data.occurredAt).toISOString(), mood: parsed.data.mood, reasonId: parsed.data.reasonId }];
+    return [{ occurredAt: new Date(parsed.data.occurredAt).toISOString(), mood: parsed.data.mood, reasonId: parsed.data.reasonId, durationMinutes: parsed.data.durationMinutes }];
   });
 
   return {

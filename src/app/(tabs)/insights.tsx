@@ -1,8 +1,8 @@
-import { addWeeks, differenceInCalendarWeeks, endOfWeek, format, isSameDay, isSameWeek, startOfWeek, subWeeks } from 'date-fns';
-import { ChevronLeft, ChevronRight, Share2 } from 'lucide-react-native';
+import { addDays, addWeeks, differenceInCalendarWeeks, endOfDay, endOfWeek, format, isSameDay, isSameWeek, startOfDay, startOfWeek, subWeeks } from 'date-fns';
+import { CalendarClock, CalendarRange, ChevronLeft, ChevronRight, MessageSquareText, Share2 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Alert, Share, StyleSheet, View } from 'react-native';
 import Animated, { FadeInLeft, FadeInRight } from 'react-native-reanimated';
 
 import { MeetingCard } from '@/components/meeting-card';
@@ -10,7 +10,11 @@ import { PressableScale, Rise, useRollingNumber } from '@/components/motion';
 import { UndoBar } from '@/components/undo-bar';
 import { WeekChart } from '@/components/week-chart';
 import { AppText, Button, Card, EmptyState, formatSigned, Glow, GradientCard, Header, Pill, Screen, SectionTitle } from '@/components/ui';
+import { addCalendarHolds, BUFFER_EVENT_TITLE, calendarAssistAvailable, loadCalendarSlots } from '@/data/calendar-assist';
 import { REASON_MAP } from '@/domain/constants';
+import { planBuffers } from '@/domain/reset';
+import { getHitRateByType, getOutcomeHitRate } from '@/domain/trends';
+import { getSeriesVerdicts, VERDICT_WEEKS, verdictMessage, type SeriesVerdict } from '@/domain/verdicts';
 import { meetingTypeLabel } from '@/domain/meeting-types';
 import { summarizeWeek, weekOverWeekDelta } from '@/domain/insights';
 import { summarizeBudget } from '@/domain/budget';
@@ -53,6 +57,14 @@ export default function InsightsScreen() {
   const recovery = useMemo(() => summarizeRecovery(summary.meetings, meetingBudget.preferredBufferMinutes ?? undefined), [meetingBudget.preferredBufferMinutes, summary.meetings]);
   const budget = useMemo(() => summarizeBudget(summary.meetings, meetingBudget), [meetingBudget, summary.meetings]);
   const series = useMemo(() => getRecurringSeries(seriesMeetings).slice(0, 3), [seriesMeetings]);
+  const verdictStart = useMemo(() => startOfWeek(subWeeks(start, VERDICT_WEEKS - 1), { weekStartsOn }), [start, weekStartsOn]);
+  const verdicts = useMemo(() => {
+    const recent = seriesMeetings.filter((meeting) => new Date(meeting.occurredAt) >= verdictStart);
+    return new Map(getSeriesVerdicts(recent).map((verdict) => [verdict.key, verdict]));
+  }, [seriesMeetings, verdictStart]);
+  const hitRate = useMemo(() => getOutcomeHitRate(seriesMeetings), [seriesMeetings]);
+  const hitRateByType = useMemo(() => getHitRateByType(seriesMeetings).slice(0, 3), [seriesMeetings]);
+  const [protecting, setProtecting] = useState(false);
   const timePatterns = useMemo(() => summarizeTimePatterns(seriesMeetings), [seriesMeetings]);
   const actionKit = useMemo(() => listActionKit(), []);
   const isCurrentWeek = isSameWeek(weekAnchor, new Date(), { weekStartsOn });
@@ -68,6 +80,49 @@ export default function InsightsScreen() {
   const emptyCopy = isCurrentWeek
     ? { title: 'This week is still building', body: 'Log a meeting to begin building your weekly signal. Three reflections are enough to surface the first pattern.' }
     : { title: 'This week was quiet', body: 'No reflections were captured in this week. Jump back to now, or log one if you want the pattern later.' };
+
+  const shareVerdict = async (verdict: SeriesVerdict, decision: SeriesDecision) => {
+    await Share.share({ message: verdictMessage(verdict, decision) }).catch(() => undefined);
+  };
+
+  /** Finds back-to-back runs in tomorrow's calendar and offers to hold a buffer after each one. */
+  const protectTomorrow = async () => {
+    setProtecting(true);
+    try {
+      const tomorrow = addDays(new Date(), 1);
+      const result = await loadCalendarSlots(startOfDay(tomorrow), endOfDay(tomorrow));
+      if (result.permission !== 'granted') {
+        Alert.alert('Calendar access is off', 'Nothing was read or added. You can allow calendar access in system settings.');
+        return;
+      }
+      const bufferMinutes = meetingBudget.preferredBufferMinutes ?? 15;
+      const proposals = planBuffers(result.slots, new Date(), bufferMinutes);
+      if (!proposals.length) {
+        Alert.alert('Tomorrow already breathes', `No back-to-back runs with a free ${bufferMinutes}-minute gap after them were found.`);
+        return;
+      }
+      const lines = proposals.map((item) => `• ${format(new Date(item.startIso), 'h:mm a')} after ${item.chainCount} meetings in a row`).join('\n');
+      Alert.alert(
+        `Add ${proposals.length} buffer${proposals.length === 1 ? '' : 's'} tomorrow?`,
+        `${bufferMinutes}-minute holds marked busy in your default calendar:\n${lines}`,
+        [
+          { text: 'Not now', style: 'cancel' },
+          {
+            text: 'Add buffers',
+            onPress: () => {
+              void addCalendarHolds(proposals.map((item) => ({ startIso: item.startIso, minutes: item.minutes, title: BUFFER_EVENT_TITLE, notes: `Recovery after ${item.chainCount} back-to-back meetings. Added by Meeting Pulse.` })))
+                .then((count) => Alert.alert('Buffers added', `${count} hold${count === 1 ? '' : 's'} added to tomorrow.`))
+                .catch((error: unknown) => Alert.alert('Nothing was added', error instanceof Error ? error.message : 'Please try again.'));
+            },
+          },
+        ],
+      );
+    } catch {
+      Alert.alert('Calendar unavailable', 'Meeting Pulse could not read tomorrow’s meeting times.');
+    } finally {
+      setProtecting(false);
+    }
+  };
 
   const reviewSeries = async (item: SeriesPulse, decision: SeriesDecision) => {
     await saveSeriesReviews(upsertSeriesReview(seriesReviews, {
@@ -168,6 +223,9 @@ export default function InsightsScreen() {
                 <AppText style={{ color: colors.inkSoft }}>Log meeting start times and durations to see how tight turnarounds land.</AppText>
               )}
             </Card>
+            {calendarAssistAvailable() ? (
+              <Button label="Protect tomorrow’s buffers" variant="secondary" loading={protecting} onPress={() => { void protectTomorrow(); }} icon={<CalendarClock size={18} color={colors.ink} />} />
+            ) : null}
           </View>
 
           {budget.enabled && (budget.metrics.length || budget.preferredBufferMinutes) ? (
@@ -199,12 +257,26 @@ export default function InsightsScreen() {
                     <AppText variant="title">{item.title}</AppText>
                     <AppText style={{ color: colors.inkSoft }}>{patternWeeks}-week average {formatSigned(item.average)}{item.trend == null ? '' : ` · recent trend ${formatSigned(item.trend)}`}</AppText>
                   </View>
+                  {(() => {
+                    const verdict = verdicts.get(item.key);
+                    if (!verdict) return null;
+                    const verdictTone = verdict.totalImpact < 0 ? colors.wine : colors.moss;
+                    return (
+                      <View style={[styles.verdict, { borderColor: verdictTone }]}>
+                        <AppText variant="label" style={{ color: verdictTone }}>Verdict · last {VERDICT_WEEKS} weeks</AppText>
+                        <AppText variant="title">
+                          {verdict.totalImpact < 0 ? 'Cost' : 'Returned'} {formatSigned(verdict.totalImpact)} across {verdict.hours} {verdict.hours === 1 ? 'hour' : 'hours'}
+                        </AppText>
+                        <AppText style={{ color: colors.inkSoft }}>Suggested: {SERIES_DECISION_LABELS[verdict.suggestion]}. {verdict.because}</AppText>
+                      </View>
+                    );
+                  })()}
                   <AppText variant="small" style={{ color: colors.inkSoft }}>What should happen to this recurring format?</AppText>
                   <View style={styles.pills}>
                     {SERIES_DECISIONS.map((decision) => (
                       <Pill
                         key={decision}
-                        label={SERIES_DECISION_LABELS[decision]}
+                        label={`${SERIES_DECISION_LABELS[decision]}${verdicts.get(item.key)?.suggestion === decision ? ' · suggested' : ''}`}
                         selected={seriesReviews.find((review) => review.key === item.key)?.decision === decision}
                         onPress={() => { void reviewSeries(item, decision); }}
                       />
@@ -212,17 +284,52 @@ export default function InsightsScreen() {
                   </View>
                   {(() => {
                     const decision = seriesReviews.find((review) => review.key === item.key)?.decision;
-                    return decision && decision !== 'keep' ? (
-                      <Button label="Prepare a safe message" variant="secondary" onPress={() => router.push({ pathname: '/team-experiment', params: { insightId: `series-${decision}`, start: start.toISOString() } })} />
-                    ) : null;
+                    const verdict = verdicts.get(item.key);
+                    const messageDecision = decision ?? verdict?.suggestion;
+                    return (
+                      <>
+                        {verdict && messageDecision && messageDecision !== 'keep' ? (
+                          <Button label="Send the organizer a note" variant="secondary" onPress={() => { void shareVerdict(verdict, messageDecision); }} icon={<MessageSquareText size={18} color={colors.ink} />} />
+                        ) : null}
+                        {decision && decision !== 'keep' ? (
+                          <Button label="Prepare a safe message" variant="ghost" onPress={() => router.push({ pathname: '/team-experiment', params: { insightId: `series-${decision}`, start: start.toISOString() } })} />
+                        ) : null}
+                      </>
+                    );
                   })()}
                 </Card>
               ))}
             </View>
           ) : null}
 
+          {hitRate.withIntent ? (
+            <View style={styles.snapshot}>
+              <SectionTitle eyebrow="Outcome hit rate" title="Did meetings produce what they were for?" />
+              <Card style={styles.hitCard}>
+                {hitRate.rate != null ? (
+                  <>
+                    <View style={styles.hitTop}>
+                      <AppText variant="hero" style={{ color: hitRate.rate >= 60 ? colors.moss : hitRate.rate >= 40 ? colors.amber : colors.wine }}>{hitRate.rate}%</AppText>
+                      <AppText style={{ flex: 1, color: colors.inkSoft }}>of {hitRate.answered} meeting{hitRate.answered === 1 ? '' : 's'} with an intended outcome produced it over the last {patternWeeks} weeks. Partly counts as half.</AppText>
+                    </View>
+                    {hitRateByType.length ? hitRateByType.map((item) => (
+                      <View key={item.meetingType} style={styles.budgetRow}>
+                        <AppText style={{ flex: 1 }}>{meetingTypeLabel(item.meetingType, customMeetingTypes)}</AppText>
+                        <AppText variant="small" style={{ color: colors.inkSoft }}>{item.answered} answered</AppText>
+                        <AppText variant="title" style={{ color: (item.rate ?? 0) >= 60 ? colors.moss : (item.rate ?? 0) >= 40 ? colors.amber : colors.wine, minWidth: 48, textAlign: 'right' }}>{item.rate}%</AppText>
+                      </View>
+                    )) : null}
+                  </>
+                ) : (
+                  <AppText style={{ color: colors.inkSoft }}>You wrote {hitRate.withIntent} intended outcome{hitRate.withIntent === 1 ? '' : 's'}. Answer “Did it produce it?” in the outcome check to see your hit rate.</AppText>
+                )}
+              </Card>
+            </View>
+          ) : null}
+
           <View style={styles.snapshot}>
             <SectionTitle eyebrow="Longer view" title="When meetings tend to land well" />
+            <Button label="Month in pixels and quarterly trends" variant="secondary" onPress={() => router.push('/trends')} icon={<CalendarRange size={18} color={colors.ink} />} />
             <AppText style={{ color: colors.inkSoft }}>Compare weekday and time-of-day signals across several weeks without adding another permanent dashboard.</AppText>
             <Button label={showLongerPatterns ? 'Hide longer view' : 'Explore longer patterns'} variant="secondary" onPress={() => setShowLongerPatterns((value) => !value)} />
             {showLongerPatterns ? (
@@ -325,7 +432,7 @@ function PatternMetric({ label, count, average }: { label: string; count: number
     <View style={styles.patternMetric} accessibilityLabel={`${label}, ${count} logged meetings${average == null ? ', more data needed' : `, average ${formatSigned(average)}`}`}>
       <AppText variant="label" style={{ color: colors.inkSoft }}>{label}</AppText>
       <AppText variant="title" style={{ color }}>{average == null ? '—' : formatSigned(average)}</AppText>
-      <AppText variant="small" style={{ color: colors.inkSoft }}>{count} logs</AppText>
+      <AppText variant="small" style={{ color: colors.inkSoft }}>{count} {count === 1 ? 'log' : 'logs'}</AppText>
     </View>
   );
 }
@@ -372,6 +479,9 @@ const styles = StyleSheet.create({
   insightCard: { flexDirection: 'row', gap: spacing.md, padding: spacing.md },
   insightNumber: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
   seriesCard: { gap: spacing.sm },
+  verdict: { gap: 4, padding: spacing.sm, borderLeftWidth: 2, borderRadius: radius.sm, backgroundColor: 'rgba(7,10,18,0.38)' },
+  hitCard: { gap: spacing.md },
+  hitTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   recoveryCard: { gap: spacing.md },
   recoveryMetrics: { flexDirection: 'row', gap: spacing.sm },

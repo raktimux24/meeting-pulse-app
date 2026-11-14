@@ -41,7 +41,7 @@ export default function CalendarAssistScreen() {
         <ShieldCheck size={24} color={colors.moss} />
         <View style={{ flex: 1, gap: 4 }}>
           <AppText variant="title">Nothing is imported automatically</AppText>
-          <AppText style={{ color: colors.inkSoft }}>Choose a time slot to open a reflection. Meeting Pulse stores nothing until you explicitly save it.</AppText>
+          <AppText style={{ color: colors.inkSoft }}>Choose a time slot to open a reflection. Meeting Pulse stores nothing until you explicitly save it. If you turn on after-meeting check-ins in Settings, times are also read when the app opens, only to schedule those notifications.</AppText>
         </View>
       </Card>
 

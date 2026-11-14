@@ -10,7 +10,10 @@ import { Alert, StyleSheet, TextInput, View } from 'react-native';
 
 import { AppText, Button, Card, Pill, Screen, SectionTitle } from '@/components/ui';
 import { makeDemoMeetings } from '@/data/fixtures';
+import { healthAvailable, requestHealthAccess } from '@/data/health';
+import { enableNudgePermissions, nudgesSupported } from '@/data/nudges';
 import { reminderSupported, sendTestReminder } from '@/data/reminder';
+import { NUDGE_DELAYS } from '@/domain/nudges';
 import { MEETING_TYPE_LABELS } from '@/domain/constants';
 import { addCustomReason, mergeCustomReasons, removeCustomReason } from '@/domain/custom-reasons';
 import { parseExportJson, type ImportPreview } from '@/domain/import-export';
@@ -33,6 +36,10 @@ export default function SettingsScreen() {
     changeWeekStart,
     reminder,
     saveReminder,
+    nudges,
+    saveNudges,
+    healthSync,
+    saveHealthSync,
     meetingBudget,
     saveMeetingBudget,
     customMeetingTypes,
@@ -146,6 +153,40 @@ export default function SettingsScreen() {
       await saveReminder({ ...reminder, enabled });
     } catch (error) {
       Alert.alert('Reminder not set', error instanceof Error ? error.message : 'Please try again.');
+    }
+  };
+
+  const toggleNudges = async (enabled: boolean) => {
+    try {
+      if (enabled) await enableNudgePermissions();
+      const count = await saveNudges({ ...nudges, enabled });
+      if (enabled) {
+        Alert.alert(
+          'Check-ins are on',
+          count
+            ? `${count} check-in${count === 1 ? '' : 's'} planned for the next two days. New meetings are picked up each time you open the app.`
+            : 'No upcoming meetings found in the next two days. New meetings are picked up each time you open the app.',
+        );
+      }
+    } catch (error) {
+      Alert.alert('Check-ins not turned on', error instanceof Error ? error.message : 'Please try again.');
+    }
+  };
+
+  const toggleHealth = async (enabled: boolean) => {
+    if (!enabled) {
+      await saveHealthSync(false);
+      return;
+    }
+    try {
+      const granted = await requestHealthAccess();
+      if (!granted) {
+        Alert.alert('Apple Health is off', 'Meeting Pulse was not allowed to save State of Mind. You can allow it in the Health app under Sharing > Apps > Meeting Pulse.');
+        return;
+      }
+      await saveHealthSync(true);
+    } catch (error) {
+      Alert.alert('Apple Health unavailable', error instanceof Error ? error.message : 'Please try again.');
     }
   };
 
@@ -374,6 +415,59 @@ export default function SettingsScreen() {
           </>
         ) : null}
       </View>
+
+      <View style={styles.section}>
+        <SectionTitle eyebrow="Habit" title="After-meeting check-ins" />
+        <Card style={styles.preference}>
+          <View style={{ flex: 1, gap: 4 }}>
+            <AppText variant="title">Ask as each meeting ends</AppText>
+            <AppText style={{ color: colors.inkSoft }}>
+              {nudgesSupported()
+                ? 'A notification when a calendar meeting ends, with mood buttons for a one-tap Quick Pulse. Only start and end times are read: titles and attendees never leave your calendar.'
+                : 'Check-ins need the iOS or Android app.'}
+            </AppText>
+          </View>
+          {nudgesSupported() ? (
+            <View style={styles.pills}>
+              <Pill label="Off" selected={!nudges.enabled} onPress={() => { void toggleNudges(false); }} />
+              <Pill label="On" selected={nudges.enabled} onPress={() => { void toggleNudges(true); }} />
+            </View>
+          ) : (
+            <AppText variant="small" style={{ color: colors.amber }}>Available on device only</AppText>
+          )}
+        </Card>
+        {nudgesSupported() && nudges.enabled ? (
+          <View style={{ gap: 8 }}>
+            <AppText variant="small" style={{ color: colors.inkSoft }}>Send it this long after the meeting ends</AppText>
+            <View style={styles.pills}>
+              {NUDGE_DELAYS.map((minutes) => (
+                <Pill
+                  key={minutes}
+                  label={minutes === 0 ? 'Right away' : `${minutes} min`}
+                  selected={nudges.delayMinutes === minutes}
+                  onPress={() => { void saveNudges({ enabled: true, delayMinutes: minutes }).catch(() => undefined); }}
+                />
+              ))}
+            </View>
+          </View>
+        ) : null}
+      </View>
+
+      {healthAvailable() ? (
+        <View style={styles.section}>
+          <SectionTitle eyebrow="Apple Health" title="Save moods as State of Mind" />
+          <Card style={styles.preference}>
+            <View style={{ flex: 1, gap: 4 }}>
+              <AppText variant="title">Add meeting moods to Health</AppText>
+              <AppText style={{ color: colors.inkSoft }}>Each reflection or Quick Pulse becomes a momentary emotion tagged Work, at the time the meeting ended. Only the mood is shared. Meeting Pulse never reads your health data.</AppText>
+            </View>
+            <View style={styles.pills}>
+              <Pill label="Off" selected={!healthSync} onPress={() => { void toggleHealth(false); }} />
+              <Pill label="On" selected={healthSync} onPress={() => { void toggleHealth(true); }} />
+            </View>
+          </Card>
+        </View>
+      ) : null}
 
       <View style={styles.section}>
         <SectionTitle eyebrow="Optional assist" title="Calendar time slots" />

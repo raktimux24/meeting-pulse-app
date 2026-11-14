@@ -57,6 +57,7 @@ export const quickPulseSchema = z.object({
   occurredAt: z.string().min(1),
   mood: z.enum(MOODS),
   reasonId: z.string().trim().min(1).max(48).nullable().optional().default(null),
+  durationMinutes: z.number().int().min(1).max(720).nullable().optional().default(null),
   createdAt: z.string().optional(),
 });
 

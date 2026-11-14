@@ -1,5 +1,6 @@
 import * as Haptics from 'expo-haptics';
-import { router } from 'expo-router';
+import { format } from 'date-fns';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Check, ChevronDown } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Alert, StyleSheet, Pressable, View } from 'react-native';
@@ -10,12 +11,34 @@ import { MOODS, type Mood } from '@/domain/types';
 import { useAppData } from '@/providers/app-data-provider';
 import { colors, radius, spacing } from '@/theme/tokens';
 
+function firstParam(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 export default function QuickPulseScreen() {
   const { createQuickPulse, customReasons } = useAppData();
-  const [mood, setMood] = useState<Mood | null>(null);
+  // Widgets and Siri pass ?mood=; after-meeting check-ins pass the meeting's ?at= and ?duration=.
+  const params = useLocalSearchParams<{ mood?: string | string[]; at?: string | string[]; duration?: string | string[] }>();
+  const presetMood = firstParam(params.mood);
+  const atParam = firstParam(params.at);
+  const meetingStart = atParam && !Number.isNaN(new Date(atParam).getTime()) ? new Date(atParam) : null;
+  const durationParam = Number(firstParam(params.duration));
+  const meetingDuration = Number.isInteger(durationParam) && durationParam >= 1 && durationParam <= 720 ? durationParam : null;
+  const validPreset = presetMood && (MOODS as readonly string[]).includes(presetMood) ? (presetMood as Mood) : null;
+  const [mood, setMood] = useState<Mood | null>(validPreset);
   const [reasonId, setReasonId] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [saving, setSaving] = useState(false);
+  // A widget or Siri can open this screen again while it is already showing: take the new mood.
+  const [appliedPreset, setAppliedPreset] = useState(validPreset);
+  if (validPreset !== appliedPreset) {
+    setAppliedPreset(validPreset);
+    if (validPreset) {
+      setMood(validPreset);
+      setReasonId(null);
+      setShowAll(false);
+    }
+  }
   const reasons = useMemo(() => {
     const sentiment = mood && MOOD_CONFIG[mood].score > 0 ? 'positive' : mood && MOOD_CONFIG[mood].score < 0 ? 'negative' : null;
     const all = [
@@ -29,7 +52,7 @@ export default function QuickPulseScreen() {
     if (!mood || !reasonId || saving) return;
     setSaving(true);
     try {
-      await createQuickPulse({ occurredAt: new Date().toISOString(), mood, reasonId });
+      await createQuickPulse({ occurredAt: (meetingStart ?? new Date()).toISOString(), mood, reasonId, durationMinutes: meetingDuration });
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.replace('/(tabs)/today');
     } catch {
@@ -44,7 +67,11 @@ export default function QuickPulseScreen() {
       <View style={styles.intro}>
         <AppText variant="label" style={{ color: colors.orange }}>Ten-second capture</AppText>
         <AppText variant="display">Quick Pulse</AppText>
-        <AppText style={{ color: colors.inkSoft }}>Capture the signal now. Add the meeting name and duration when you have space.</AppText>
+        <AppText style={{ color: colors.inkSoft }}>
+          {meetingStart
+            ? `For your ${format(meetingStart, 'h:mm a')} meeting${meetingDuration ? ` (${meetingDuration} min)` : ''}. Add the name when you have space.`
+            : 'Capture the signal now. Add the meeting name and duration when you have space.'}
+        </AppText>
       </View>
 
       <View style={styles.section}>

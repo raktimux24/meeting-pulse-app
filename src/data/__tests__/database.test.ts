@@ -42,7 +42,7 @@ describe('database migration', () => {
       'ALTER TABLE meetings ADD COLUMN ownership_status TEXT;',
       'ALTER TABLE meetings ADD COLUMN next_step_status TEXT;',
       'ALTER TABLE meetings ADD COLUMN intended_outcome TEXT;',
-      'PRAGMA user_version = 5',
+      'PRAGMA user_version = 6',
     ]));
   });
 
@@ -55,7 +55,8 @@ describe('database migration', () => {
     expect(statements).toContain('ALTER TABLE meetings ADD COLUMN intended_outcome TEXT;');
     expect(statements).toContain('ALTER TABLE meetings ADD COLUMN intended_outcome_met TEXT;');
     expect(statements.some((sql) => sql.includes('CREATE TABLE IF NOT EXISTS quick_pulses'))).toBe(true);
-    expect(statements).toContain('PRAGMA user_version = 5');
+    expect(statements).toContain('PRAGMA user_version = 6');
+    expect(statements).toContain('ALTER TABLE quick_pulses ADD COLUMN duration_minutes INTEGER;');
   });
 
   it('recalculates stored scores with the reason cap when upgrading from version 3', async () => {

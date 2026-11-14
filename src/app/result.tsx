@@ -1,14 +1,16 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowRight, Check, Plus, RotateCcw } from 'lucide-react-native';
+import { ArrowRight, CalendarPlus, Check, Plus, RotateCcw } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { Easing, useAnimatedProps, useSharedValue, withDelay, withTiming, ZoomIn } from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
 
 import { Rise, useRollingNumber } from '@/components/motion';
 import { AppText, Button, Card, formatSigned, Glow, LoadingState, NotFoundState, Screen } from '@/components/ui';
+import { addCalendarHolds, calendarAssistAvailable, RESET_EVENT_TITLE } from '@/data/calendar-assist';
 import { MOOD_CONFIG } from '@/domain/constants';
+import { RESET_MINUTES, RESET_STEPS, shouldSuggestReset } from '@/domain/reset';
 import { originPath } from '@/domain/format';
 import { answeredOutcomeCount, INTENDED_OUTCOME_LABELS, OUTCOME_STATUS_LABELS } from '@/domain/outcomes';
 import { getImpactLabel, getMeetingSuggestion, getScoreBreakdown } from '@/domain/scoring';
@@ -150,6 +152,12 @@ function ResultContent({ meeting, edited, from }: { meeting: Meeting; edited: bo
         </Card>
       </Rise>
 
+      {shouldSuggestReset(meeting) && !edited ? (
+        <Rise delay={880} style={styles.full}>
+          <ResetCard />
+        </Rise>
+      ) : null}
+
       <Rise delay={940} style={styles.actions}>
         <Button label="Done" onPress={() => router.replace(home)} iconPosition="trailing" icon={<ArrowRight size={19} color={colors.onAccent} />} />
         <Button label="View reflection" variant="secondary" onPress={() => router.replace({ pathname: '/meeting/[id]', params: { id: meeting.id, from: from ?? 'today' } })} />
@@ -157,6 +165,40 @@ function ResultContent({ meeting, edited, from }: { meeting: Meeting; edited: bo
         <Button label="Log another" variant="ghost" onPress={() => router.replace({ pathname: '/log', params: { from: from ?? 'today' } })} icon={<Plus size={19} color={colors.ink} />} />
       </Rise>
     </Screen>
+  );
+}
+
+/** After a costly meeting: a short reset, and an offer to protect the next ten minutes in the calendar. */
+function ResetCard() {
+  const [blocked, setBlocked] = useState(false);
+  const [working, setWorking] = useState(false);
+  const blockNow = async () => {
+    setWorking(true);
+    try {
+      await addCalendarHolds([{ startIso: new Date().toISOString(), minutes: RESET_MINUTES, title: RESET_EVENT_TITLE, notes: 'A short reset after a draining meeting. Added by Meeting Pulse.' }]);
+      setBlocked(true);
+    } catch (error) {
+      Alert.alert('Nothing was added', error instanceof Error ? error.message : 'Please try again.');
+    } finally {
+      setWorking(false);
+    }
+  };
+  return (
+    <Card style={styles.resetCard}>
+      <AppText variant="label" style={{ color: colors.wine }}>That one cost you</AppText>
+      <AppText variant="title">Take a {RESET_MINUTES}-minute reset before the next thing</AppText>
+      {RESET_STEPS.map((step, index) => (
+        <View key={step} style={styles.resetStep}>
+          <AppText variant="label" style={{ color: colors.inkSoft, width: 14, paddingTop: 3 }}>{index + 1}</AppText>
+          <AppText style={{ flex: 1, color: colors.inkSoft }}>{step}</AppText>
+        </View>
+      ))}
+      {calendarAssistAvailable() ? (
+        blocked
+          ? <AppText style={{ color: colors.moss }}>Blocked the next {RESET_MINUTES} minutes in your calendar.</AppText>
+          : <Button label={`Block the next ${RESET_MINUTES} minutes`} variant="secondary" loading={working} onPress={() => { void blockNow(); }} icon={<CalendarPlus size={18} color={colors.ink} />} />
+      ) : null}
+    </Card>
   );
 }
 
@@ -184,5 +226,7 @@ const styles = StyleSheet.create({
   mathPart: { alignItems: 'center' },
   operator: { color: colors.inkSoft },
   coachCard: { gap: spacing.sm, borderRadius: radius.md },
+  resetCard: { gap: spacing.sm, borderRadius: radius.md, backgroundColor: colors.wineSoft },
+  resetStep: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' },
   actions: { width: '100%', gap: 10 },
 });

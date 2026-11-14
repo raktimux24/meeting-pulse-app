@@ -105,7 +105,7 @@ describe('export import', () => {
     expect(preview.meetings[0]?.intendedOutcome).toBe('Choose one direction');
     expect(preview.meetings[0]?.reasonIds).toEqual(['custom-good-context']);
     expect(preview.customReasons).toHaveLength(1);
-    expect(preview.quickPulses).toEqual([{ occurredAt: '2026-10-25T09:00:00.000Z', mood: 'clear', reasonId: 'custom-good-context' }]);
+    expect(preview.quickPulses).toEqual([{ occurredAt: '2026-10-25T09:00:00.000Z', mood: 'clear', reasonId: 'custom-good-context', durationMinutes: null }]);
   });
 
   it('accepts a custom meeting type and imported type catalog', () => {

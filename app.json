@@ -15,10 +15,16 @@
         "usesNonExemptEncryption": false
       },
       "entitlements": {
-        "aps-environment": "production"
+        "aps-environment": "production",
+        "com.apple.developer.healthkit": true,
+        "com.apple.developer.healthkit.access": []
       },
       "runtimeVersion": {
         "policy": "appVersion"
+      },
+      "infoPlist": {
+        "NSHealthUpdateUsageDescription": "Meeting Pulse can save how each meeting felt to Apple Health as a State of Mind entry, tagged as work. Only the mood is shared: no titles, notes or people.",
+        "NSHealthShareUsageDescription": "Meeting Pulse does not read your health data. This permission is only used to save meeting moods you choose to share."
       }
     },
     "android": {
@@ -94,7 +100,29 @@
             "enableSceneSupport": true
           }
         }
-      ]
+      ],
+      [
+        "expo-widgets",
+        {
+          "widgets": [
+            {
+              "name": "PulseWidget",
+              "displayName": "Meeting Pulse",
+              "description": "Today's meeting pulse, with one-tap Quick Pulse moods.",
+              "ios": {
+                "supportedFamilies": [
+                  "systemSmall",
+                  "systemMedium",
+                  "accessoryCircular",
+                  "accessoryRectangular",
+                  "accessoryInline"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "./plugins/with-meeting-pulse-intents.js"
     ],
     "experiments": {
       "typedRoutes": true,
