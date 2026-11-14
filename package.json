@@ -1,5 +1,5 @@
 {
-  "name": "codex_app_test",
+  "name": "meeting_pulse",
   "main": "expo-router/entry",
   "version": "1.0.1",
   "dependencies": {

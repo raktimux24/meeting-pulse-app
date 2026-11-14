@@ -1,6 +1,6 @@
 import { describe, expect, it, test } from '@jest/globals';
 
-import { calculateImpactScore, getDurationMultiplier, getImpactLabel, getPulseClassification } from '../scoring';
+import { calculateImpactScore, getDurationMultiplier, getImpactLabel, getPulseClassification, getPulseTone, getReasonModifier } from '../scoring';
 
 describe('meeting impact scoring', () => {
   test.each([
@@ -28,6 +28,12 @@ describe('meeting impact scoring', () => {
   it('lets reasons affect a neutral meeting', () => {
     expect(calculateImpactScore('neutral', 30, ['fast-decision'])).toBe(2);
   });
+
+  it('caps reasons so they cannot overturn the mood', () => {
+    expect(getReasonModifier(['clear-outcome', 'fast-decision', 'strong-alignment'])).toBe(3);
+    expect(getReasonModifier(['no-decision', 'unclear-ownership', 'could-have-been-async'])).toBe(-3);
+    expect(calculateImpactScore('frustrated', 90, ['clear-outcome', 'fast-decision', 'strong-alignment'])).toBe(-3);
+  });
 });
 
 describe('pulse labels', () => {
@@ -41,6 +47,15 @@ describe('pulse labels', () => {
     [-20, 'Heavy meeting week'],
   ])('classifies %s as %s', (score, label) => {
     expect(getPulseClassification(score as number)).toBe(label);
+  });
+
+  test.each([
+    [5, 'positive'],
+    [4.9, 'neutral'],
+    [-0.6, 'neutral'],
+    [-5, 'negative'],
+  ])('gives %s the same tone as its week label: %s', (score, tone) => {
+    expect(getPulseTone(score as number)).toBe(tone);
   });
 
   test.each([

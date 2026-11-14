@@ -126,7 +126,9 @@ export type WeekSummary = {
   mostUsefulType: MeetingType | null;
   topNegativeReason: ReasonId | null;
   bestPattern: string;
-  weekdayScores: { date: string; label: string; score: number }[];
+  hasEnoughSignal: boolean;
+  pulseTone: 'positive' | 'neutral' | 'negative';
+  weekdayScores: { date: string; label: string; score: number; count: number }[];
   insights: Insight[];
 };
 

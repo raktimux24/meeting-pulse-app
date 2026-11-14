@@ -5,9 +5,11 @@ import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, Minus, Plus, RotateCcw } from 'lucide-react-native';
 import { Controller, useForm, useWatch } from 'react-hook-form';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import Animated, { FadeInLeft, FadeInRight, useAnimatedStyle, useSharedValue, withTiming, ZoomIn } from 'react-native-reanimated';
 
+import { PressableScale } from '@/components/motion';
 import { AppText, Button, Card, LoadingState, NotFoundState, Pill, Screen, formatSigned } from '@/components/ui';
 import { MOOD_CONFIG, REASONS } from '@/domain/constants';
 import { catalogMeetingTypes } from '@/domain/meeting-types';
@@ -45,6 +47,9 @@ export default function LogMeetingScreen() {
   const [intendedOutcome, setIntendedOutcome] = useState('');
   const [showIntendedOutcome, setShowIntendedOutcome] = useState(false);
   const [history, setHistory] = useState<Meeting[]>([]);
+  const [hasAdvanced, setHasAdvanced] = useState(false);
+  const titleRef = useRef<TextInput>(null);
+  const isEditing = Boolean(id);
 
   const { control, handleSubmit, reset, setValue, trigger, formState: { errors } } = useForm<MeetingDetailsInput>({
     resolver: zodResolver(meetingDetailsSchema),
@@ -109,8 +114,19 @@ export default function LogMeetingScreen() {
   const titles = useMemo(() => recentTitles(history), [history]);
   const previewScore = mood ? calculateImpactScore(mood, duration, reasonIds) : null;
 
+  // autoFocus fires while the modal is still animating in, so early keystrokes were lost.
+  // Focus once the sheet has settled instead (new meetings only).
+  useEffect(() => {
+    if (isEditing || hasAdvanced || step !== 1 || loadingEdit) return;
+    const timer = setTimeout(() => titleRef.current?.focus(), 450);
+    return () => clearTimeout(timer);
+  }, [hasAdvanced, isEditing, loadingEdit, step]);
+
   const next = async () => {
-    if (await trigger()) setStep(2);
+    if (await trigger()) {
+      setHasAdvanced(true);
+      setStep(2);
+    }
   };
 
   const toggleReason = (reasonId: string) => {
@@ -178,20 +194,20 @@ export default function LogMeetingScreen() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={80}>
-      <Screen topSafe={false}>
+      <Screen key={step} topSafe={false}>
         <View style={styles.progressHeader}>
           <View>
             <AppText variant="label" style={{ color: colors.orange }}>Step {step} of 2</AppText>
             <AppText variant="display">{step === 1 ? 'Meeting details' : 'How did it land?'}</AppText>
           </View>
-          <View style={styles.progress}><View style={styles.progressActive} /><View style={[styles.progressPart, step === 2 && styles.progressActive]} /></View>
+          <View style={styles.progress}><View style={styles.progressActive} /><View style={styles.progressPart}>{step === 2 ? <ProgressFill /> : null}</View></View>
         </View>
 
         {step === 1 ? (
-          <View style={styles.form}>
+          <Animated.View entering={hasAdvanced ? FadeInLeft.duration(320) : undefined} style={styles.form}>
             <Field label="Meeting name" error={errors.title?.message}>
               <Controller control={control} name="title" render={({ field: { value, onChange, onBlur } }) => (
-                <TextInput accessibilityLabel="Meeting name" value={value} onChangeText={onChange} onBlur={onBlur} placeholder="e.g. Design review" placeholderTextColor={colors.lineDark} style={styles.input} autoFocus={!id} returnKeyType="done" />
+                <TextInput accessibilityLabel="Meeting name" value={value} onChangeText={onChange} onBlur={onBlur} ref={titleRef} placeholder="e.g. Design review" placeholderTextColor={colors.placeholder} style={styles.input} returnKeyType="done" />
               )} />
               {titles.length ? (
                 <View style={styles.pills}>
@@ -214,7 +230,7 @@ export default function LogMeetingScreen() {
                 value={intendedOutcome}
                 onChangeText={setIntendedOutcome}
                 placeholder="e.g. Choose one launch direction"
-                placeholderTextColor={colors.lineDark}
+                placeholderTextColor={colors.placeholder}
                 style={styles.input}
                 maxLength={160}
                 accessibilityLabel="Intended meeting outcome"
@@ -224,9 +240,9 @@ export default function LogMeetingScreen() {
             <Field label="Duration" error={errors.durationMinutes?.message}>
               <View style={styles.pills}>{[15, 30, 45, 60].map((minutes) => <Pill key={minutes} label={`${minutes} min`} selected={duration === minutes} onPress={() => setValue('durationMinutes', minutes, { shouldValidate: true })} />)}</View>
               <View style={styles.counter}>
-                <Pressable accessibilityRole="button" accessibilityLabel="Decrease duration" onPress={() => setValue('durationMinutes', Math.max(1, duration - 5), { shouldValidate: true })} style={styles.counterButton}><Minus size={18} color={colors.ink} /></Pressable>
+                <PressableScale haptic="selection" scaleTo={0.88} accessibilityRole="button" accessibilityLabel="Decrease duration" onPress={() => setValue('durationMinutes', Math.max(1, duration - 5), { shouldValidate: true })} style={styles.counterButton}><Minus size={18} color={colors.ink} /></PressableScale>
                 <View style={styles.counterValue}><Clock3 size={17} color={colors.orange} /><AppText variant="title">{duration} minutes</AppText></View>
-                <Pressable accessibilityRole="button" accessibilityLabel="Increase duration" onPress={() => setValue('durationMinutes', Math.min(720, duration + 5), { shouldValidate: true })} style={styles.counterButton}><Plus size={18} color={colors.ink} /></Pressable>
+                <PressableScale haptic="selection" scaleTo={0.88} accessibilityRole="button" accessibilityLabel="Increase duration" onPress={() => setValue('durationMinutes', Math.min(720, duration + 5), { shouldValidate: true })} style={styles.counterButton}><Plus size={18} color={colors.ink} /></PressableScale>
               </View>
             </Field>
 
@@ -237,9 +253,9 @@ export default function LogMeetingScreen() {
 
             <Field label="People in the room">
               <View style={styles.counter}>
-                <Pressable accessibilityRole="button" accessibilityLabel="Decrease people count" onPress={() => setValue('peopleCount', Math.max(1, peopleCount - 1))} style={styles.counterButton}><Minus size={18} color={colors.ink} /></Pressable>
+                <PressableScale haptic="selection" scaleTo={0.88} accessibilityRole="button" accessibilityLabel="Decrease people count" onPress={() => setValue('peopleCount', Math.max(1, peopleCount - 1))} style={styles.counterButton}><Minus size={18} color={colors.ink} /></PressableScale>
                 <AppText variant="title">{peopleCount} {peopleCount === 1 ? 'person' : 'people'}</AppText>
-                <Pressable accessibilityRole="button" accessibilityLabel="Increase people count" onPress={() => setValue('peopleCount', Math.min(999, peopleCount + 1))} style={styles.counterButton}><Plus size={18} color={colors.ink} /></Pressable>
+                <PressableScale haptic="selection" scaleTo={0.88} accessibilityRole="button" accessibilityLabel="Increase people count" onPress={() => setValue('peopleCount', Math.min(999, peopleCount + 1))} style={styles.counterButton}><Plus size={18} color={colors.ink} /></PressableScale>
               </View>
             </Field>
 
@@ -256,7 +272,7 @@ export default function LogMeetingScreen() {
                   <View style={styles.whenIcon}><CalendarDays size={20} color={colors.orange} /></View>
                   <View style={styles.whenCopy}>
                     <AppText variant="title">Meeting start</AppText>
-                    <AppText variant="small" style={{ color: colors.inkSoft }}>Defaults to now. Choose any earlier date and time.</AppText>
+                    <AppText variant="small" style={{ color: colors.inkSoft }}>{isEditing ? 'When this meeting started. Change it if needed.' : 'Defaults to now. Choose any earlier date and time.'}</AppText>
                   </View>
                   <Pressable accessibilityRole="button" accessibilityLabel="Use current date and time" onPress={() => { setShowPicker(null); setOccurredAt(new Date()); }} style={({ pressed }) => [styles.nowButton, pressed && styles.pressed]}>
                     <RotateCcw size={14} color={colors.orange} />
@@ -299,15 +315,15 @@ export default function LogMeetingScreen() {
             {showNote ? (
               <Field label="" error={errors.note?.message}>
                 <Controller control={control} name="note" render={({ field: { value, onChange, onBlur } }) => (
-                  <TextInput accessibilityLabel="Private note" value={value} onChangeText={onChange} onBlur={onBlur} placeholder="Anything you want to remember…" placeholderTextColor={colors.lineDark} style={[styles.input, styles.note]} multiline textAlignVertical="top" />
+                  <TextInput accessibilityLabel="Private note" value={value} onChangeText={onChange} onBlur={onBlur} placeholder="Anything you want to remember…" placeholderTextColor={colors.placeholder} style={[styles.input, styles.note]} multiline textAlignVertical="top" />
                 )} />
               </Field>
             ) : null}
 
-            <Button label="Continue to mood check" onPress={next} icon={<ChevronRight size={19} color={colors.white} />} />
-          </View>
+            <Button label="Continue to mood check" onPress={next} iconPosition="trailing" icon={<ChevronRight size={19} color={colors.onAccent} />} />
+          </Animated.View>
         ) : (
-          <View style={styles.form}>
+          <Animated.View entering={FadeInRight.duration(320)} style={styles.form}>
             {previewScore != null ? (
               <View style={styles.preview} accessibilityLiveRegion="polite">
                 <AppText variant="label" style={{ color: colors.orange }}>This will land as</AppText>
@@ -325,8 +341,9 @@ export default function LogMeetingScreen() {
                   const config = MOOD_CONFIG[item];
                   const selected = mood === item;
                   return (
-                    <Pressable
+                    <PressableScale
                       key={item}
+                      scaleTo={0.96}
                       accessibilityRole="button"
                       accessibilityState={{ selected }}
                       accessibilityLabel={`${config.label}, ${config.score > 0 ? `plus ${config.score}` : config.score}${selected ? ', selected' : ''}`}
@@ -336,10 +353,10 @@ export default function LogMeetingScreen() {
                       }}
                       style={[styles.moodCard, config.score > 0 ? styles.moodPositive : config.score < 0 ? styles.moodNegative : styles.moodNeutral, selected && styles.moodSelected]}
                     >
-                      <AppText variant="label" style={{ color: selected ? colors.orange : config.score > 0 ? colors.moss : config.score < 0 ? colors.wine : colors.amber }}>{config.score > 0 ? `+${config.score}` : config.score}</AppText>
-                      <AppText variant="title" style={{ color: selected ? colors.white : colors.ink }}>{config.label}</AppText>
-                      {selected ? <Check size={17} color={colors.orange} /> : null}
-                    </Pressable>
+                      <AppText variant="small" style={{ fontFamily: fonts.bodyBold, color: config.score > 0 ? colors.moss : config.score < 0 ? colors.wine : colors.amber }}>{formatSigned(config.score)}</AppText>
+                      <AppText variant="title">{config.label}</AppText>
+                      {selected ? <Animated.View entering={ZoomIn.duration(220)} style={styles.moodCheck}><Check size={14} color={colors.onAccent} strokeWidth={3} /></Animated.View> : null}
+                    </PressableScale>
                   );
                 })}
               </View>
@@ -369,11 +386,21 @@ export default function LogMeetingScreen() {
               <Button label="Back" variant="secondary" onPress={() => setStep(1)} icon={<ChevronLeft size={19} color={colors.ink} />} style={{ flex: 1 }} />
               <Button label={id ? 'Update meeting' : 'Save reflection'} onPress={save} disabled={!mood} loading={saving} style={{ flex: 2 }} />
             </View>
-          </View>
+          </Animated.View>
         )}
       </Screen>
     </KeyboardAvoidingView>
   );
+}
+
+/** Second progress segment fills as step 2 appears. */
+function ProgressFill() {
+  const filled = useSharedValue(0);
+  useEffect(() => {
+    filled.value = withTiming(1, { duration: 450 });
+  }, [filled]);
+  const animatedStyle = useAnimatedStyle(() => ({ width: `${filled.value * 100}%` }));
+  return <Animated.View style={[styles.progressFill, animatedStyle]} />;
 }
 
 function firstParam(value: string | string[] | undefined): string | undefined {
@@ -424,6 +451,7 @@ const styles = StyleSheet.create({
   progressHeader: { gap: spacing.md },
   progress: { flexDirection: 'row', gap: 6 },
   progressPart: { flex: 1, height: 5, borderRadius: 3, backgroundColor: colors.line },
+  progressFill: { height: 5, borderRadius: 3, backgroundColor: colors.orange, shadowColor: colors.orange, shadowOpacity: 0.7, shadowRadius: 8 },
   progressActive: { flex: 1, height: 5, borderRadius: 3, backgroundColor: colors.orange, shadowColor: colors.orange, shadowOpacity: 0.7, shadowRadius: 8 },
   form: { gap: spacing.xl },
   field: { gap: spacing.sm },
@@ -452,10 +480,12 @@ const styles = StyleSheet.create({
   preview: { gap: 4, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.lineDark, backgroundColor: colors.surfaceGlass },
   question: { gap: spacing.md },
   moodGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  moodCard: { width: '48%', minHeight: 104, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surfaceGlass, padding: spacing.md, gap: 5, justifyContent: 'space-between', shadowColor: colors.shadow, shadowOpacity: 0.18, shadowRadius: 12 },
+  moodCard: { flexBasis: '45%', flexGrow: 1, minHeight: 104, borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surfaceGlass, padding: spacing.md, gap: 5, justifyContent: 'space-between', shadowColor: colors.shadow, shadowOpacity: 0.18, shadowRadius: 12 },
   moodPositive: { backgroundColor: 'rgba(23,53,47,0.64)' },
   moodNegative: { backgroundColor: 'rgba(59,32,41,0.64)' },
   moodNeutral: { backgroundColor: 'rgba(58,48,32,0.60)' },
-  moodSelected: { backgroundColor: colors.surfaceElevated, borderColor: colors.orange, borderWidth: 1.5, shadowColor: colors.orange, shadowOpacity: 0.28, shadowRadius: 16 },
+  // Keep the mood's tint when selected; the ring and tick carry the selection.
+  moodSelected: { borderColor: colors.orange, shadowColor: colors.orange, shadowOpacity: 0.28, shadowRadius: 16 },
+  moodCheck: { position: 'absolute', top: 12, right: 12, width: 24, height: 24, borderRadius: 12, backgroundColor: colors.orange, alignItems: 'center', justifyContent: 'center' },
   actions: { flexDirection: 'row', gap: 10 },
 });

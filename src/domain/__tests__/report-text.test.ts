@@ -12,6 +12,8 @@ const summary: WeekSummary = {
   totalMinutes: 120,
   weeklyPulse: 3,
   classification: 'Neutral Week',
+  hasEnoughSignal: true,
+  pulseTone: 'neutral',
   positiveCount: 3,
   neutralCount: 0,
   negativeCount: 1,

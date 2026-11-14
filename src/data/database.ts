@@ -1,6 +1,10 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-const DATABASE_VERSION = 3;
+import { MOOD_CONFIG } from '@/domain/constants';
+import { calculateImpactScore } from '@/domain/scoring';
+import type { Mood } from '@/domain/types';
+
+const DATABASE_VERSION = 4;
 
 export async function migrateDatabase(db: SQLiteDatabase) {
   await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
@@ -58,6 +62,22 @@ export async function migrateDatabase(db: SQLiteDatabase) {
       );
       CREATE INDEX IF NOT EXISTS idx_quick_pulses_occurred_at ON quick_pulses(occurred_at);
     `);
+  }
+
+  if (currentVersion < 4) {
+    // v4 caps how far reasons can move a score, so stored scores are recalculated once.
+    const rows = await db.getAllAsync<{ id: string; mood: string; duration_minutes: number; reason_ids: string | null }>(
+      `SELECT m.id, m.mood, m.duration_minutes, GROUP_CONCAT(mr.reason_id) AS reason_ids
+       FROM meetings m LEFT JOIN meeting_reasons mr ON mr.meeting_id = m.id GROUP BY m.id`,
+    );
+    await db.withTransactionAsync(async () => {
+      for (const row of rows) {
+        if (!(row.mood in MOOD_CONFIG)) continue;
+        const reasonIds = row.reason_ids ? row.reason_ids.split(',') : [];
+        const score = calculateImpactScore(row.mood as Mood, row.duration_minutes, reasonIds);
+        await db.runAsync('UPDATE meetings SET impact_score = ? WHERE id = ?', score, row.id);
+      }
+    });
   }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);

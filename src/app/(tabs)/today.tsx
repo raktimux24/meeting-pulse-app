@@ -6,8 +6,9 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { MeetingCard } from '@/components/meeting-card';
+import { Rise, useRollingNumber } from '@/components/motion';
 import { UndoBar } from '@/components/undo-bar';
-import { AppText, Button, Card, EmptyState, formatSigned, GradientCard, Header, Screen, SectionTitle } from '@/components/ui';
+import { AppText, Button, Card, EmptyState, formatSigned, Glow, GradientCard, Header, Screen, SectionTitle } from '@/components/ui';
 import { priorityBudgetMetric, summarizeBudget } from '@/domain/budget';
 import { summarizeRecovery } from '@/domain/recovery';
 import type { ExperimentResult, Meeting, QuickPulse } from '@/domain/types';
@@ -35,6 +36,8 @@ export default function TodayScreen() {
   const recovery = summarizeRecovery(meetings, meetingBudget.preferredBufferMinutes ?? undefined);
   const budgetSummary = summarizeBudget(weekMeetings, meetingBudget);
   const budgetMetric = priorityBudgetMetric(budgetSummary);
+  const pulseTone = pulse > 0 ? colors.moss : pulse < 0 ? colors.wine : colors.amber;
+  const shownPulse = useRollingNumber(pulse);
   return (
     <Screen>
       <Header
@@ -125,10 +128,10 @@ export default function TodayScreen() {
         </Card>
       ) : null}
 
-      <View style={styles.captureActions}>
-        <Button style={{ flex: 1 }} label="Quick Pulse" onPress={() => router.push('/quick-pulse')} icon={<Bolt size={20} color={colors.white} />} />
+      <Rise index={1} style={styles.captureActions}>
+        <Button style={{ flex: 1 }} label="Quick Pulse" onPress={() => router.push('/quick-pulse')} icon={<Bolt size={20} color={colors.onAccent} />} />
         <Button style={{ flex: 1 }} label="Full reflection" variant="secondary" onPress={() => router.push({ pathname: '/log', params: { from: 'today' } })} icon={<Plus size={20} color={colors.ink} />} />
-      </View>
+      </Rise>
 
       {quickPulses.length ? (
         <Card style={styles.pendingCard}>
@@ -141,16 +144,18 @@ export default function TodayScreen() {
         </Card>
       ) : null}
 
+      <Rise>
       <GradientCard colors={gradients.hero} style={styles.pulseCard}>
-        <View pointerEvents="none" style={styles.heroGlow} />
         <View style={styles.pulseTop}>
           <View style={styles.pulseCopy}>
             <AppText variant="label" style={{ color: colors.orange }}>Energy balance</AppText>
             <AppText variant="hero" accessibilityLabel={`${pulse >= 0 ? 'positive' : 'negative'} ${Math.abs(pulse)} energy balance`}>
-              {formatSigned(pulse)}
+              {formatSigned(shownPulse)}
             </AppText>
           </View>
           <View style={styles.pulseStage}>
+            {/* Glow is centred on the disc and takes the day's colour. */}
+            <Glow color={pulseTone} size={240} opacity={0.24} style={styles.stageGlow} />
             <View pointerEvents="none" style={[styles.orbit, styles.orbitOuter]} />
             <View pointerEvents="none" style={[styles.orbit, styles.orbitMid]} />
             <PulseDisc pulse={pulse} />
@@ -165,6 +170,7 @@ export default function TodayScreen() {
           <Metric value={`${positive}/${neutral}/${negative}`} label="Return mix" hint={`${positive} returned, ${neutral} neutral, ${negative} cost`} />
         </View>
       </GradientCard>
+      </Rise>
 
       {recovery.tightTransitions > 0 ? (
         <Card style={styles.signalCard}>
@@ -191,8 +197,10 @@ export default function TodayScreen() {
       <View style={styles.list}>
         <SectionTitle eyebrow="Daily log" title={meetings.length ? `${meetings.length} reflection${meetings.length === 1 ? '' : 's'}` : 'Your meetings'} />
         {meetings.length ? (
-          meetings.map((meeting) => (
-            <MeetingCard key={meeting.id} meeting={meeting} onPress={() => router.push({ pathname: '/meeting/[id]', params: { id: meeting.id, from: 'today' } })} />
+          meetings.map((meeting, index) => (
+            <Rise key={meeting.id} index={index + 2}>
+              <MeetingCard meeting={meeting} onPress={() => router.push({ pathname: '/meeting/[id]', params: { id: meeting.id, from: 'today' } })} />
+            </Rise>
           ))
         ) : (
           <EmptyState
@@ -335,5 +343,5 @@ const styles = StyleSheet.create({
   reviewButton: { minWidth: '47%', flexGrow: 1 },
   pendingCard: { gap: spacing.md },
   signalCard: { gap: spacing.sm },
-  heroGlow: { position: 'absolute', width: 160, height: 160, borderRadius: 80, backgroundColor: colors.orange, opacity: 0.12, right: -28, top: -70, shadowColor: colors.orange, shadowOpacity: 0.9, shadowRadius: 70 },
+  stageGlow: { left: (88 - 240) / 2, top: (88 - 240) / 2 },
 });

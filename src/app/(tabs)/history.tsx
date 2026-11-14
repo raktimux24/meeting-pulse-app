@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
 import { MeetingCard } from '@/components/meeting-card';
+import { Rise } from '@/components/motion';
 import { UndoBar } from '@/components/undo-bar';
 import { AppText, Button, EmptyState, Header, Pill, Screen, formatSigned } from '@/components/ui';
 import { meetingTypeLabel } from '@/domain/meeting-types';
@@ -81,14 +82,14 @@ export default function HistoryScreen() {
         const showMonth = index === 0 || startOfMonth(groups[index - 1]!.date).getTime() !== monthStart.getTime();
         const dayPulse = Math.round(group.meetings.reduce((sum, meeting) => sum + meeting.impactScore, 0) * 10) / 10;
         return (
-          <View key={group.date.toISOString()} style={styles.group}>
+          <Rise key={group.date.toISOString()} index={index} style={styles.group}>
             {showMonth ? <AppText variant="label" style={{ color: colors.orange }}>{format(group.date, 'MMMM yyyy')}</AppText> : null}
             <View style={styles.dateRow}>
               <AppText variant="title">{format(group.date, 'EEEE')}</AppText>
               <AppText variant="small" style={{ color: colors.inkSoft }}>{format(group.date, 'MMMM d')} · {formatSigned(dayPulse)}</AppText>
             </View>
             {group.meetings.map((meeting) => <MeetingCard key={meeting.id} meeting={meeting} onPress={() => router.push({ pathname: '/meeting/[id]', params: { id: meeting.id, from: 'history' } })} />)}
-          </View>
+          </Rise>
         );
       }) : (
         <EmptyState

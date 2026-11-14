@@ -1,13 +1,15 @@
-import { addWeeks, endOfWeek, format, isSameDay, isSameWeek, startOfWeek, subWeeks } from 'date-fns';
+import { addWeeks, differenceInCalendarWeeks, endOfWeek, format, isSameDay, isSameWeek, startOfWeek, subWeeks } from 'date-fns';
 import { ChevronLeft, ChevronRight, Share2 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import Animated, { FadeInLeft, FadeInRight } from 'react-native-reanimated';
 
 import { MeetingCard } from '@/components/meeting-card';
+import { PressableScale, Rise, useRollingNumber } from '@/components/motion';
 import { UndoBar } from '@/components/undo-bar';
 import { WeekChart } from '@/components/week-chart';
-import { AppText, Button, Card, EmptyState, formatSigned, GradientCard, Header, Pill, Screen, SectionTitle } from '@/components/ui';
+import { AppText, Button, Card, EmptyState, formatSigned, Glow, GradientCard, Header, Pill, Screen, SectionTitle } from '@/components/ui';
 import { REASON_MAP } from '@/domain/constants';
 import { meetingTypeLabel } from '@/domain/meeting-types';
 import { summarizeWeek, weekOverWeekDelta } from '@/domain/insights';
@@ -19,10 +21,12 @@ import { buildTeamExperiment, listActionKit } from '@/domain/team-experiments';
 import { summarizeTimePatterns } from '@/domain/time-patterns';
 import { SERIES_DECISIONS, type Meeting, type SeriesDecision, type SeriesPulse } from '@/domain/types';
 import { useAppData } from '@/providers/app-data-provider';
-import { colors, gradients, radius, spacing } from '@/theme/tokens';
+import { colors, fonts, gradients, radius, spacing } from '@/theme/tokens';
 
 export default function InsightsScreen() {
   const [weekAnchor, setWeekAnchor] = useState(new Date());
+  // Which way the user last moved, so the new week slides in from that side.
+  const [direction, setDirection] = useState<'back' | 'forward'>('back');
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [previousMeetings, setPreviousMeetings] = useState<Meeting[]>([]);
   const [seriesMeetings, setSeriesMeetings] = useState<Meeting[]>([]);
@@ -52,7 +56,11 @@ export default function InsightsScreen() {
   const timePatterns = useMemo(() => summarizeTimePatterns(seriesMeetings), [seriesMeetings]);
   const actionKit = useMemo(() => listActionKit(), []);
   const isCurrentWeek = isSameWeek(weekAnchor, new Date(), { weekStartsOn });
-  const pulseTone = summary.weeklyPulse > 0 ? colors.moss : summary.weeklyPulse < 0 ? colors.wine : colors.amber;
+  // Tone follows the same thresholds as the week label, so colour and words agree.
+  const pulseTone = summary.pulseTone === 'positive' ? colors.moss : summary.pulseTone === 'negative' ? colors.wine : colors.amber;
+  const shownPulse = useRollingNumber(summary.weeklyPulse);
+  const weeksAgo = differenceInCalendarWeeks(new Date(), weekAnchor, { weekStartsOn });
+  const weekLabel = isCurrentWeek ? 'This week' : weeksAgo === 1 ? 'Last week' : `${weeksAgo} weeks ago`;
   const dayMeetings = selectedDay
     ? summary.meetings.filter((meeting) => isSameDay(new Date(meeting.occurredAt), new Date(selectedDay)))
     : [];
@@ -83,27 +91,27 @@ export default function InsightsScreen() {
       <UndoBar />
 
       <View style={styles.weekNav}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Previous week" onPress={() => { setSelectedDay(null); setWeekAnchor((date) => subWeeks(date, 1)); }} style={styles.navButton}>
+        <PressableScale accessibilityRole="button" accessibilityLabel="Previous week" haptic="selection" scaleTo={0.9} onPress={() => { setDirection('back'); setSelectedDay(null); setWeekAnchor((date) => subWeeks(date, 1)); }} style={styles.navButton}>
           <ChevronLeft size={20} color={colors.ink} />
-        </Pressable>
+        </PressableScale>
         <View style={{ alignItems: 'center' }}>
-          <AppText variant="small" style={{ color: colors.inkSoft }}>{isCurrentWeek ? 'This week' : format(start, 'MMM d')}</AppText>
-          <AppText style={{ fontFamily: 'DMSans_700Bold' }}>{format(start, 'MMM d')} – {format(end, 'MMM d')}</AppText>
+          <AppText variant="small" style={{ color: colors.inkSoft }}>{weekLabel}</AppText>
+          <AppText style={{ fontFamily: fonts.bodyBold }}>{format(start, 'MMM d')} – {format(end, 'MMM d')}</AppText>
         </View>
-        <Pressable accessibilityRole="button" accessibilityLabel="Next week" disabled={isCurrentWeek} onPress={() => { setSelectedDay(null); setWeekAnchor((date) => addWeeks(date, 1)); }} style={[styles.navButton, isCurrentWeek && { opacity: 0.25 }]}>
+        <PressableScale accessibilityRole="button" accessibilityLabel="Next week" haptic="selection" scaleTo={0.9} disabled={isCurrentWeek} onPress={() => { setDirection('forward'); setSelectedDay(null); setWeekAnchor((date) => addWeeks(date, 1)); }} style={[styles.navButton, isCurrentWeek && { opacity: 0.25 }]}>
           <ChevronRight size={20} color={colors.ink} />
-        </Pressable>
+        </PressableScale>
       </View>
-      {!isCurrentWeek ? <Button label="Jump to this week" variant="ghost" onPress={() => { setSelectedDay(null); setWeekAnchor(new Date()); }} /> : null}
+      {!isCurrentWeek ? <Button label="Jump to this week" variant="ghost" onPress={() => { setDirection('forward'); setSelectedDay(null); setWeekAnchor(new Date()); }} /> : null}
 
       {summary.meetingCount ? (
-        <>
+        <Animated.View key={start.toISOString()} entering={(direction === 'back' ? FadeInLeft : FadeInRight).duration(320)} style={styles.week}>
           <GradientCard colors={gradients.hero} style={styles.heroCard}>
-            <View pointerEvents="none" style={[styles.heroGlow, { backgroundColor: pulseTone, shadowColor: pulseTone }]} />
+            <Glow color={pulseTone} size={360} opacity={0.24} style={{ right: -160, top: -170 }} />
             <View style={styles.heroTop}>
               <View style={{ flex: 1 }}>
                 <AppText variant="label" style={{ color: pulseTone }}>Meeting pulse</AppText>
-                <AppText variant="hero" style={{ color: pulseTone }}>{formatSigned(summary.weeklyPulse)}</AppText>
+                <AppText variant="hero" style={{ color: pulseTone }}>{formatSigned(shownPulse)}</AppText>
                 <AppText variant="title">{summary.classification}</AppText>
                 {delta ? (
                   <AppText variant="small" style={{ color: colors.inkSoft }}>
@@ -113,7 +121,7 @@ export default function InsightsScreen() {
               </View>
               <View style={styles.countBlock}>
                 <AppText variant="display">{summary.meetingCount}</AppText>
-                <AppText variant="small" style={{ color: colors.inkSoft }}>meetings</AppText>
+                <AppText variant="small" style={{ color: colors.inkSoft }}>{summary.meetingCount === 1 ? 'meeting' : 'meetings'}</AppText>
                 <AppText variant="small" style={{ color: colors.inkSoft }}>{(summary.totalMinutes / 60).toFixed(1)} hours</AppText>
               </View>
             </View>
@@ -138,7 +146,7 @@ export default function InsightsScreen() {
             </View>
           ) : null}
 
-          <Button label="Create shareable report" onPress={() => router.push({ pathname: '/report', params: { start: start.toISOString() } })} icon={<Share2 size={19} color={colors.white} />} />
+          <Button label="Create shareable report" onPress={() => router.push({ pathname: '/report', params: { start: start.toISOString() } })} icon={<Share2 size={19} color={colors.onAccent} />} />
 
           <View style={styles.snapshot}>
             <SectionTitle eyebrow="Recovery radar" title="How tightly the week was packed" />
@@ -254,21 +262,23 @@ export default function InsightsScreen() {
             ) : null}
           </View>
 
-          <View style={styles.snapshot}>
+          {/* Hidden until there are enough meetings to call anything a pattern. */}
+          {summary.hasEnoughSignal ? <View style={styles.snapshot}>
             <SectionTitle eyebrow="At a glance" title="What shaped the week" />
             <View style={styles.snapshotGrid}>
-              <Snapshot label="Most useful" value={summary.mostUsefulType ? meetingTypeLabel(summary.mostUsefulType, customMeetingTypes) : 'No clear leader'} tone="positive" />
-              <Snapshot label="Most draining" value={summary.mostDrainingType ? meetingTypeLabel(summary.mostDrainingType, customMeetingTypes) : 'No clear drag'} tone="negative" />
-              <Snapshot label="Top friction" value={summary.topNegativeReason ? REASON_MAP[summary.topNegativeReason].label : 'None repeated'} tone="negative" />
-              <Snapshot label="Best pattern" value={summary.bestPattern} tone="positive" />
+              <Snapshot index={0} label="Most useful" value={summary.mostUsefulType ? meetingTypeLabel(summary.mostUsefulType, customMeetingTypes) : 'No clear leader'} tone="positive" />
+              <Snapshot index={1} label="Most draining" value={summary.mostDrainingType ? meetingTypeLabel(summary.mostDrainingType, customMeetingTypes) : 'No clear drag'} tone="negative" />
+              <Snapshot index={2} label="Top friction" value={summary.topNegativeReason ? REASON_MAP[summary.topNegativeReason].label : 'None repeated'} tone="negative" />
+              <Snapshot index={3} label="Best pattern" value={summary.bestPattern} tone="positive" />
             </View>
-          </View>
+          </View> : null}
 
           <View style={styles.insights}>
             <SectionTitle eyebrow="Coach’s notes" title="What to change next" />
             <AppText style={{ color: colors.inkSoft }}>These notes come from simple rules on this device, not a model or a manager score.</AppText>
             {summary.insights.map((insight, index) => (
-              <Card key={insight.id} style={styles.insightCard}>
+              <Rise key={insight.id} index={index} delay={200}>
+              <Card style={styles.insightCard}>
                 <View style={[styles.insightNumber, { backgroundColor: insight.tone === 'positive' ? colors.mossSoft : insight.tone === 'negative' ? colors.wineSoft : colors.amberSoft }]}>
                   <AppText variant="label">0{index + 1}</AppText>
                 </View>
@@ -290,9 +300,10 @@ export default function InsightsScreen() {
                   ) : null}
                 </View>
               </Card>
+              </Rise>
             ))}
           </View>
-        </>
+        </Animated.View>
       ) : (
         <EmptyState
           title={emptyCopy.title}
@@ -331,19 +342,22 @@ function Balance({ value, label, color }: { value: number; label: string; color:
   return <View style={styles.balance}><View style={[styles.dot, { backgroundColor: color, shadowColor: color }]} /><AppText variant="small">{value} {label}</AppText></View>;
 }
 
-function Snapshot({ label, value, tone }: { label: string; value: string; tone: 'positive' | 'negative' }) {
+function Snapshot({ label, value, tone, index }: { label: string; value: string; tone: 'positive' | 'negative'; index: number }) {
   return (
-    <Card style={[styles.snapshotCard, { backgroundColor: tone === 'positive' ? colors.mossSoft : colors.wineSoft }]}>
-      <AppText variant="label" style={{ color: tone === 'positive' ? colors.moss : colors.wine }}>{label}</AppText>
-      <AppText variant="title">{value}</AppText>
-    </Card>
+    <Rise index={index} delay={160} style={styles.snapshotCell}>
+      <Card style={[styles.snapshotCard, { backgroundColor: tone === 'positive' ? colors.mossSoft : colors.wineSoft }]}>
+        <AppText variant="label" style={{ color: tone === 'positive' ? colors.moss : colors.wine }}>{label}</AppText>
+        <AppText variant="title">{value}</AppText>
+      </Card>
+    </Rise>
   );
 }
 
 const styles = StyleSheet.create({
   weekNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   navButton: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', backgroundColor: 'rgba(17,24,39,0.62)', alignItems: 'center', justifyContent: 'center', shadowColor: colors.shadow, shadowOpacity: 0.25, shadowRadius: 12 },
-  heroCard: { minHeight: 320, gap: spacing.md, overflow: 'hidden' },
+  week: { gap: spacing.lg },
+  heroCard: { gap: spacing.md, overflow: 'hidden' },
   heroTop: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.md },
   countBlock: { alignItems: 'flex-end', paddingBottom: 4 },
   balanceRow: { flexDirection: 'row', gap: spacing.md, flexWrap: 'wrap' },
@@ -351,7 +365,9 @@ const styles = StyleSheet.create({
   dot: { width: 9, height: 9, borderRadius: 5, shadowOpacity: 0.6, shadowRadius: 7 },
   snapshot: { gap: spacing.md },
   snapshotGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  snapshotCard: { width: '48%', minHeight: 140, padding: spacing.md, justifyContent: 'space-between', gap: spacing.md, borderRadius: radius.md, borderColor: colors.lineDark },
+  // flex columns so the grid reaches the right margin (48% + a fixed gap fell 4pt short).
+  snapshotCell: { flexBasis: '45%', flexGrow: 1 },
+  snapshotCard: { flex: 1, minHeight: 124, padding: spacing.md, justifyContent: 'space-between', gap: spacing.md, borderRadius: radius.md, borderColor: colors.lineDark },
   insights: { gap: spacing.md },
   insightCard: { flexDirection: 'row', gap: spacing.md, padding: spacing.md },
   insightNumber: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
@@ -362,7 +378,6 @@ const styles = StyleSheet.create({
   recoveryMetric: { flex: 1, gap: 3 },
   budgetCard: { gap: spacing.md },
   budgetRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
-  heroGlow: { position: 'absolute', width: 220, height: 220, borderRadius: 110, opacity: 0.10, right: -95, top: -92, shadowOpacity: 0.9, shadowRadius: 90 },
   patternCard: { gap: spacing.md },
   patternGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   daypartGrid: { flexDirection: 'row', gap: 8 },

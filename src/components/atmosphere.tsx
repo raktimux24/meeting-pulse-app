@@ -2,6 +2,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useWindowDimensions, StyleSheet, View } from 'react-native';
 import Svg, { Circle, Defs, Line, LinearGradient as SvgGradient, Pattern, Rect, Stop } from 'react-native-svg';
 
+import { Glow } from '@/components/glow';
 import { colors, gradients } from '@/theme/tokens';
 
 export function Atmosphere() {
@@ -10,9 +11,10 @@ export function Atmosphere() {
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill} accessibilityElementsHidden>
       <LinearGradient colors={gradients.screen} locations={[0, 0.42, 1]} style={StyleSheet.absoluteFill} />
-      <View style={[styles.orb, styles.orbCoral]} />
-      <View style={[styles.orb, styles.orbIndigo]} />
-      <View style={[styles.orb, styles.orbAmber]} />
+      {/* Radial gradients instead of solid discs, so the glows have no visible edge. */}
+      <Glow color={colors.orange} size={620} opacity={0.22} style={{ right: -300, top: -280 }} />
+      <Glow color={colors.navy} size={680} opacity={0.17} style={{ left: -380, top: 140 }} />
+      <Glow color={colors.amber} size={420} opacity={0.07} style={{ right: -60, bottom: -10 }} />
       <Svg width={width} height={height} style={StyleSheet.absoluteFill}>
         <Defs>
           <Pattern id="pulseDots" x="0" y="0" width="22" height="22" patternUnits="userSpaceOnUse">
@@ -50,39 +52,5 @@ export function Atmosphere() {
 }
 
 const styles = StyleSheet.create({
-  orb: { position: 'absolute', borderRadius: 999 },
-  orbCoral: {
-    width: 320,
-    height: 320,
-    right: -150,
-    top: -130,
-    backgroundColor: colors.orange,
-    opacity: 0.16,
-    shadowColor: colors.orange,
-    shadowOpacity: 0.95,
-    shadowRadius: 110,
-  },
-  orbIndigo: {
-    width: 360,
-    height: 360,
-    left: -210,
-    top: 280,
-    backgroundColor: colors.navy,
-    opacity: 0.14,
-    shadowColor: colors.blue,
-    shadowOpacity: 0.8,
-    shadowRadius: 120,
-  },
-  orbAmber: {
-    width: 220,
-    height: 220,
-    right: 40,
-    bottom: 90,
-    backgroundColor: colors.amber,
-    opacity: 0.06,
-    shadowColor: colors.amber,
-    shadowOpacity: 0.7,
-    shadowRadius: 70,
-  },
   horizon: { position: 'absolute', top: 0, right: 0, width: '78%', height: 280 },
 });

@@ -9,10 +9,28 @@ export function getDurationMultiplier(durationMinutes: number): number {
   return 2.5;
 }
 
+/** Reasons explain a score; they should not overturn how the meeting felt. */
+export const REASON_MODIFIER_CAP = 3;
+export const MIN_MEETINGS_FOR_PATTERN = 3;
+
+/** Sum of built-in reason modifiers (custom reasons carry no weight), capped at +/-3. */
+export function getReasonModifier(reasonIds: string[]): number {
+  const total = reasonIds.reduce((sum, id) => sum + (REASON_MAP[id as keyof typeof REASON_MAP]?.modifier ?? 0), 0);
+  return Math.max(-REASON_MODIFIER_CAP, Math.min(REASON_MODIFIER_CAP, total));
+}
+
 export function calculateImpactScore(mood: Mood, durationMinutes: number, reasonIds: string[]): number {
-  const reasonTotal = reasonIds.reduce((sum, id) => sum + (REASON_MAP[id as keyof typeof REASON_MAP]?.modifier ?? 0), 0);
-  const raw = MOOD_CONFIG[mood].score * getDurationMultiplier(durationMinutes) + reasonTotal;
+  const raw = MOOD_CONFIG[mood].score * getDurationMultiplier(durationMinutes) + getReasonModifier(reasonIds);
   return Math.round(raw * 10) / 10;
+}
+
+export type PulseTone = 'positive' | 'neutral' | 'negative';
+
+/** Tone uses the same thresholds as the week label so colour and words agree. */
+export function getPulseTone(score: number): PulseTone {
+  if (score >= 5) return 'positive';
+  if (score <= -5) return 'negative';
+  return 'neutral';
 }
 
 export function getPulseClassification(score: number): string {

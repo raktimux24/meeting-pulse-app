@@ -1,8 +1,8 @@
 import { eachDayOfInterval, format, isWithinInterval } from 'date-fns';
 
-import { REASON_MAP } from './constants';
+import { REASON_MAP, REASONS } from './constants';
 import { meetingTypeLabel } from './meeting-types';
-import { getPulseClassification } from './scoring';
+import { getPulseClassification, getPulseTone, MIN_MEETINGS_FOR_PATTERN } from './scoring';
 import { getRecurringSeries } from './series';
 import { generateOutcomeInsights } from './outcomes';
 import { summarizeRecovery } from './recovery';
@@ -25,7 +25,10 @@ function rankedTypes(meetings: Meeting[]) {
     .sort((a, b) => b.average - a.average);
 }
 
-function topNegativeReason(meetings: Meeting[]): ReasonId | null {
+const REASON_ORDER = new Map(REASONS.map((reason, index) => [reason.id, index]));
+
+/** Most frequent negative reason. Ties go to the heavier reason, then to the fixed list order. */
+function topNegativeReason(meetings: Meeting[], minimumCount = 1): ReasonId | null {
   const counts = new Map<ReasonId, number>();
   meetings.forEach((meeting) =>
     meeting.reasonIds.forEach((id) => {
@@ -33,7 +36,15 @@ function topNegativeReason(meetings: Meeting[]): ReasonId | null {
       if (reason?.sentiment === 'negative') counts.set(reason.id, (counts.get(reason.id) ?? 0) + 1);
     }),
   );
-  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  const ranked = [...counts.entries()]
+    .filter(([, count]) => count >= minimumCount)
+    .sort(
+      (a, b) =>
+        b[1] - a[1] ||
+        Math.abs(REASON_MAP[b[0]].modifier) - Math.abs(REASON_MAP[a[0]].modifier) ||
+        (REASON_ORDER.get(a[0]) ?? 0) - (REASON_ORDER.get(b[0]) ?? 0),
+    );
+  return ranked[0]?.[0] ?? null;
 }
 
 export function generateInsights(meetings: Meeting[]): Insight[] {
@@ -41,12 +52,12 @@ export function generateInsights(meetings: Meeting[]): Insight[] {
   const reasonCount = (id: ReasonId) => meetings.filter((meeting) => meeting.reasonIds.includes(id)).length;
   const leadingReason = topNegativeReason(meetings);
 
-  if (meetings.length < 3) {
+  if (meetings.length < MIN_MEETINGS_FOR_PATTERN) {
     return [
       {
         id: 'keep-logging',
         eyebrow: 'Signal building',
-        title: `${meetings.length} of 3 meetings logged`,
+        title: `${meetings.length} of ${MIN_MEETINGS_FOR_PATTERN} meetings logged`,
         body: 'A few more reflections will reveal which formats consistently help or hurt your week.',
         tone: 'neutral',
       },
@@ -245,9 +256,11 @@ export function summarizeWeek(meetings: Meeting[], start: Date, end: Date): Week
     isWithinInterval(new Date(meeting.occurredAt), { start, end }),
   );
   const weeklyPulse = Math.round(weekMeetings.reduce((sum, meeting) => sum + meeting.impactScore, 0) * 10) / 10;
-  const types = rankedTypes(weekMeetings);
+  const hasEnoughSignal = weekMeetings.length >= MIN_MEETINGS_FOR_PATTERN;
+  const types = hasEnoughSignal ? rankedTypes(weekMeetings) : [];
   const bestType = types[0]?.average > 0 ? types[0].type : null;
   const worstType = [...types].reverse()[0]?.average < 0 ? [...types].reverse()[0].type : null;
+  const signedTone = weeklyPulse > 0 ? 'positive' : weeklyPulse < 0 ? 'negative' : 'neutral';
   const shortClear = weekMeetings.filter(
     (meeting) => meeting.durationMinutes <= 30 && meeting.reasonIds.includes('clear-outcome'),
   );
@@ -257,23 +270,26 @@ export function summarizeWeek(meetings: Meeting[], start: Date, end: Date): Week
     meetingCount: weekMeetings.length,
     totalMinutes: weekMeetings.reduce((sum, meeting) => sum + meeting.durationMinutes, 0),
     weeklyPulse,
-    classification: getPulseClassification(weeklyPulse),
+    classification: hasEnoughSignal ? getPulseClassification(weeklyPulse) : 'Signal still building',
+    hasEnoughSignal,
+    pulseTone: hasEnoughSignal ? getPulseTone(weeklyPulse) : signedTone,
     positiveCount: weekMeetings.filter((meeting) => meeting.impactScore > 0).length,
     neutralCount: weekMeetings.filter((meeting) => meeting.impactScore === 0).length,
     negativeCount: weekMeetings.filter((meeting) => meeting.impactScore < 0).length,
     mostDrainingType: worstType,
     mostUsefulType: bestType,
-    topNegativeReason: topNegativeReason(weekMeetings),
+    topNegativeReason: hasEnoughSignal ? topNegativeReason(weekMeetings, 2) : null,
     bestPattern: shortClear.length >= 2 ? 'Short calls with a clear outcome' : 'Still collecting signal',
-    weekdayScores: eachDayOfInterval({ start, end }).map((day) => ({
-      date: day.toISOString(),
-      label: format(day, 'EEE').slice(0, 1),
-      score: Math.round(
-        weekMeetings
-          .filter((meeting) => format(new Date(meeting.occurredAt), 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd'))
-          .reduce((sum, meeting) => sum + meeting.impactScore, 0) * 10,
-      ) / 10,
-    })),
+    weekdayScores: eachDayOfInterval({ start, end }).map((day) => {
+      const dayKey = format(day, 'yyyy-MM-dd');
+      const dayMeetings = weekMeetings.filter((meeting) => format(new Date(meeting.occurredAt), 'yyyy-MM-dd') === dayKey);
+      return {
+        date: day.toISOString(),
+        label: format(day, 'EEE').slice(0, 1),
+        score: Math.round(dayMeetings.reduce((sum, meeting) => sum + meeting.impactScore, 0) * 10) / 10,
+        count: dayMeetings.length,
+      };
+    }),
     insights: generateInsights(weekMeetings),
   };
 }

@@ -76,6 +76,33 @@ describe('insight generation', () => {
 });
 
 describe('weekly summary', () => {
+  const weekOf = () => {
+    const anchor = new Date(2026, 6, 8);
+    return { start: startOfWeek(anchor, { weekStartsOn: 1 }), end: endOfWeek(anchor, { weekStartsOn: 1 }) };
+  };
+
+  it('does not name the week or claim patterns from fewer than three meetings', () => {
+    const { start, end } = weekOf();
+    const summary = summarizeWeek([meeting({ impactScore: -7.6, meetingType: 'standup', reasonIds: ['no-decision'] })], start, end);
+    expect(summary.hasEnoughSignal).toBe(false);
+    expect(summary.classification).toBe('Signal still building');
+    expect(summary.mostDrainingType).toBeNull();
+    expect(summary.topNegativeReason).toBeNull();
+  });
+
+  it('breaks reason ties by weight and counts meetings per day', () => {
+    const { start, end } = weekOf();
+    const meetings = [
+      meeting({ impactScore: -3, reasonIds: ['poor-context', 'no-decision'] }),
+      meeting({ impactScore: -3, reasonIds: ['poor-context', 'no-decision'] }),
+      meeting({ impactScore: 2 }),
+    ];
+    const summary = summarizeWeek(meetings, start, end);
+    expect(summary.topNegativeReason).toBe('no-decision');
+    expect(summary.weekdayScores[0].count).toBe(3);
+    expect(summary.weekdayScores[1].count).toBe(0);
+  });
+
   it('aggregates pulse, duration, sentiment, and privacy-safe patterns', () => {
     const anchor = new Date(2026, 6, 8);
     const start = startOfWeek(anchor, { weekStartsOn: 1 });
@@ -92,7 +119,9 @@ describe('weekly summary', () => {
     expect(summary.classification).toBe('Neutral Week');
     expect(summary.positiveCount).toBe(2);
     expect(summary.negativeCount).toBe(1);
-    expect(summary.topNegativeReason).toBe('no-decision');
+    expect(summary.pulseTone).toBe('neutral');
+    // One mention is not a pattern.
+    expect(summary.topNegativeReason).toBeNull();
     expect(summary.weekdayScores).toHaveLength(7);
   });
 
