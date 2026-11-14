@@ -7,7 +7,8 @@ import { captureRef } from 'react-native-view-shot';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
-import { AppText, Button, formatSigned, Screen } from '@/components/ui';
+import { Rise } from '@/components/motion';
+import { AppText, Button, formatSigned, Glow, Screen } from '@/components/ui';
 import { MEETING_TYPE_LABELS, REASON_MAP } from '@/domain/constants';
 import { summarizeWeek } from '@/domain/insights';
 import type { Meeting } from '@/domain/types';
@@ -26,8 +27,12 @@ export default function ReportScreen() {
 
   useEffect(() => { getRange(start, end).then(setMeetings).finally(() => setLoaded(true)); }, [end, getRange, start]);
   const summary = useMemo(() => summarizeWeek(meetings, start, end), [end, meetings, start]);
-  const tone = summary.weeklyPulse > 0 ? colors.moss : summary.weeklyPulse < 0 ? colors.wine : colors.amber;
-  const recommendation = summary.insights[0]?.body ?? 'Keep logging to reveal a pattern worth changing.';
+  const tone = summary.pulseTone === 'positive' ? colors.moss : summary.pulseTone === 'negative' ? colors.wine : colors.amber;
+  const bandColors = summary.pulseTone === 'positive' ? gradients.positive : summary.pulseTone === 'negative' ? gradients.negative : gradients.glass;
+  // Lead with something to change; fall back to what is working.
+  const leadInsight = summary.insights.find((insight) => insight.tone === 'negative') ?? summary.insights[0];
+  const recommendation = leadInsight?.body ?? 'Keep logging to reveal a pattern worth changing.';
+  const recommendationLabel = leadInsight?.tone === 'negative' ? 'One fix for next week' : leadInsight?.tone === 'positive' ? 'Keep doing this' : 'Next step';
 
   const share = async () => {
     if (!reportRef.current || sharing) return;
@@ -37,7 +42,7 @@ export default function ReportScreen() {
         Alert.alert('Sharing unavailable', 'This device cannot open the system share sheet. Your report preview is still here.');
         return;
       }
-      const uri = await captureRef(reportRef, { format: 'png', quality: 1, result: 'tmpfile' });
+      const uri = await captureRef(reportRef, { format: 'png', quality: 1, result: 'tmpfile', fileName: `meeting-pulse-week-${format(start, 'yyyy-MM-dd')}` });
       await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Share my Meeting Pulse', UTI: 'public.png' });
     } catch {
       Alert.alert('Could not share', 'The report preview is still here. Please try again.');
@@ -50,6 +55,7 @@ export default function ReportScreen() {
     <Screen topSafe={false}>
       <View style={styles.intro}><AppText variant="label" style={{ color: colors.orange }}>Privacy-safe preview</AppText><AppText variant="display">Your meeting week, distilled.</AppText><AppText style={{ color: colors.inkSoft }}>No meeting names, notes, or attendee details appear on this card.</AppText></View>
 
+      <Rise delay={120}>
       <View ref={reportRef} collapsable={false} style={styles.report}>
         <LinearGradient colors={gradients.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
         <View style={styles.reportHeader}>
@@ -58,8 +64,8 @@ export default function ReportScreen() {
           <AppText variant="small" style={{ color: colors.inkSoft }}>MY WEEK</AppText>
         </View>
 
-        <LinearGradient colors={summary.weeklyPulse >= 0 ? gradients.positive : gradients.negative} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.scoreBand}>
-          <View pointerEvents="none" style={[styles.scoreGlow, { backgroundColor: tone, shadowColor: tone }]} />
+        <LinearGradient colors={bandColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.scoreBand}>
+          <Glow color={tone} size={300} opacity={0.26} style={{ right: -120, top: -130 }} />
           <View><AppText variant="label" style={{ color: colors.white, opacity: 0.75 }}>Mood balance</AppText><AppText style={styles.reportScore}>{formatSigned(summary.weeklyPulse)}</AppText></View>
           <View style={styles.classification}><AppText variant="title" style={{ color: colors.white, textAlign: 'right' }}>{summary.classification}</AppText></View>
         </LinearGradient>
@@ -77,14 +83,15 @@ export default function ReportScreen() {
         </View>
 
         <View style={styles.fixBlock}>
-          <AppText variant="label" style={{ color: colors.orange }}>One fix for next week</AppText>
-          <AppText variant="title">{recommendation}</AppText>
+          <AppText variant="label" style={{ color: colors.orange }}>{recommendationLabel}</AppText>
+          <AppText variant="lead">{recommendation}</AppText>
         </View>
 
         <View style={styles.reportFooter}><ShieldCheck size={16} color={colors.moss} /><AppText variant="small" style={{ color: colors.inkSoft }}>Private reflection · Shared without meeting details</AppText></View>
       </View>
+      </Rise>
 
-      <Button label="Share report as image" onPress={share} loading={sharing} disabled={!loaded} icon={<Share2 size={19} color={colors.white} />} />
+      <Button label="Share report as image" onPress={share} loading={sharing} disabled={!loaded} icon={<Share2 size={19} color={colors.onAccent} />} />
     </Screen>
   );
 }
@@ -103,9 +110,8 @@ const styles = StyleSheet.create({
   reportHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: spacing.lg },
   brandMark: { width: 30, height: 30, borderRadius: 15, borderWidth: 1, borderColor: colors.orange, alignItems: 'center', justifyContent: 'center' },
   brandDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.orange },
-  scoreBand: { minHeight: 160, padding: spacing.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
-  scoreGlow: { position: 'absolute', width: 150, height: 150, borderRadius: 75, opacity: 0.11, right: -45, top: -45, shadowOpacity: 0.9, shadowRadius: 65 },
-  reportScore: { color: colors.white, fontFamily: fonts.display, fontSize: 62, lineHeight: 66 },
+  scoreBand: { minHeight: 150, padding: spacing.lg, overflow: 'hidden', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+  reportScore: { color: colors.white, fontFamily: fonts.display, fontSize: 62, lineHeight: 70 },
   classification: { maxWidth: '48%' },
   statRow: { flexDirection: 'row', padding: spacing.lg, gap: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.line },
   stat: { flex: 1, gap: 2 },

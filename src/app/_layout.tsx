@@ -65,11 +65,11 @@ export default function RootLayout() {
               <Stack.Screen name="index" options={{ headerShown: false }} />
               <Stack.Screen name="onboarding" options={{ headerShown: false }} />
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="log" options={{ presentation: 'modal', header: () => <StackHeader title="Log a meeting" modal /> }} />
+              <Stack.Screen name="log" options={{ presentation: 'modal', header: () => <StackHeader modal /> }} />
               <Stack.Screen name="result" options={{ headerShown: false, gestureEnabled: false }} />
-              <Stack.Screen name="meeting/[id]" options={{ header: () => <StackHeader title="Meeting details" /> }} />
-              <Stack.Screen name="settings" options={{ header: () => <StackHeader title="Settings" /> }} />
-              <Stack.Screen name="report" options={{ presentation: 'modal', header: () => <StackHeader title="Weekly report" modal /> }} />
+              <Stack.Screen name="meeting/[id]" options={{ header: () => <StackHeader /> }} />
+              <Stack.Screen name="settings" options={{ header: () => <StackHeader /> }} />
+              <Stack.Screen name="report" options={{ presentation: 'modal', header: () => <StackHeader modal /> }} />
             </Stack>
           </AppDataProvider>
         </SQLiteProvider>

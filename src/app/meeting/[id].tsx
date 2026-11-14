@@ -4,6 +4,7 @@ import { Edit3, Trash2 } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
+import { Rise } from '@/components/motion';
 import { AppText, Button, Card, formatSigned, GradientCard, Pill, Screen } from '@/components/ui';
 import { MEETING_TYPE_LABELS, MOOD_CONFIG, REASON_MAP } from '@/domain/constants';
 import { getImpactLabel, getMeetingSuggestion } from '@/domain/scoring';
@@ -32,6 +33,7 @@ export default function MeetingDetailScreen() {
         <AppText variant="hero">{meeting.title}</AppText>
       </View>
 
+      <Rise>
       <GradientCard colors={meeting.impactScore >= 0 ? gradients.positive : gradients.negative} style={styles.scoreCard}>
         <View>
           <AppText variant="label" style={{ color: tone }}>Meeting impact</AppText>
@@ -42,21 +44,24 @@ export default function MeetingDetailScreen() {
           <AppText style={{ color: colors.inkSoft }}>{MOOD_CONFIG[meeting.mood].label}</AppText>
         </View>
       </GradientCard>
+      </Rise>
 
+      <Rise index={1}>
       <Card style={styles.details}>
-        <Detail label="Duration" value={`${meeting.durationMinutes} minutes`} />
+        <Detail label="Duration" value={`${meeting.durationMinutes} min`} />
         <Detail label="People" value={`${meeting.peopleCount}`} />
         <Detail label="Type" value={MEETING_TYPE_LABELS[meeting.meetingType]} />
       </Card>
+      </Rise>
 
-      <View style={styles.section}>
+      <Rise index={2} style={styles.section}>
         <AppText variant="label" style={{ color: colors.inkSoft }}>What shaped it</AppText>
         <View style={styles.pills}>{meeting.reasonIds.length ? meeting.reasonIds.map((reasonId) => <Pill key={reasonId} label={REASON_MAP[reasonId].label} tone={REASON_MAP[reasonId].sentiment} />) : <AppText style={{ color: colors.inkSoft }}>No reasons selected.</AppText>}</View>
-      </View>
+      </Rise>
 
       {meeting.note ? <Card style={styles.section}><AppText variant="label" style={{ color: colors.inkSoft }}>Private note</AppText><AppText>{meeting.note}</AppText></Card> : null}
 
-      <Card style={styles.section}><AppText variant="label" style={{ color: tone }}>One thing to try</AppText><AppText variant="title">{getMeetingSuggestion(meeting)}</AppText></Card>
+      <Card style={styles.section}><AppText variant="label" style={{ color: tone }}>One thing to try</AppText><AppText variant="lead">{getMeetingSuggestion(meeting)}</AppText></Card>
 
       <View style={styles.actions}>
         <Button label="Edit reflection" variant="secondary" onPress={() => router.push({ pathname: '/log', params: { id: meeting.id } })} icon={<Edit3 size={18} color={colors.ink} />} />

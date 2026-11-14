@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppText } from '@/components/ui';
 import { colors, fonts, gradients } from '@/theme/tokens';
 
-export function StackHeader({ title, modal = false }: { title: string; modal?: boolean }) {
+export function StackHeader({ title, modal = false }: { title?: string; modal?: boolean }) {
   const goBack = () => {
     if (router.canGoBack()) router.back();
     else router.replace('/(tabs)/today');
@@ -22,7 +22,7 @@ export function StackHeader({ title, modal = false }: { title: string; modal?: b
         <Pressable accessibilityRole="button" accessibilityLabel={modal ? 'Close' : 'Go back'} hitSlop={8} onPress={goBack} style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
           {modal ? <X size={21} color={colors.ink} /> : <ChevronLeft size={23} color={colors.ink} />}
         </Pressable>
-        <AppText style={styles.title}>{title}</AppText>
+        {title ? <AppText style={styles.title}>{title}</AppText> : null}
         <View style={styles.spacer} />
       </View>
     </SafeAreaView>
@@ -30,7 +30,7 @@ export function StackHeader({ title, modal = false }: { title: string; modal?: b
 }
 
 const styles = StyleSheet.create({
-  safe: { backgroundColor: colors.paper, borderBottomWidth: 1, borderBottomColor: colors.line },
+  safe: { backgroundColor: colors.paper },
   bar: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18 },
   back: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: colors.lineDark, backgroundColor: colors.surfaceGlass, alignItems: 'center', justifyContent: 'center' },
   title: { fontFamily: fonts.bodyBold, fontSize: 16 },

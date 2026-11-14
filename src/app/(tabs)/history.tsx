@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { MeetingCard } from '@/components/meeting-card';
-import { AppText, EmptyState, Header, Pill, Screen } from '@/components/ui';
+import { Rise } from '@/components/motion';
+import { AppText, Button, EmptyState, Header, Pill, Screen } from '@/components/ui';
 import { MEETING_TYPE_LABELS } from '@/domain/constants';
 import type { Meeting, MeetingType } from '@/domain/types';
 import { useAppData } from '@/providers/app-data-provider';
@@ -49,15 +50,15 @@ export default function HistoryScreen() {
         </View>
       </View>
 
-      {groups.length ? groups.map((group) => (
-        <View key={group.date.toISOString()} style={styles.group}>
+      {groups.length ? groups.map((group, groupIndex) => (
+        <Rise key={group.date.toISOString()} index={groupIndex} style={styles.group}>
           <View style={styles.dateRow}>
             <AppText variant="title">{format(group.date, 'EEEE')}</AppText>
             <AppText variant="small" style={{ color: colors.inkSoft }}>{format(group.date, 'MMMM d, yyyy')}</AppText>
           </View>
           {group.meetings.map((meeting) => <MeetingCard key={meeting.id} meeting={meeting} onPress={() => router.push({ pathname: '/meeting/[id]', params: { id: meeting.id } })} />)}
-        </View>
-      )) : <EmptyState title={meetings.length ? 'No matching meetings' : 'Your archive is empty'} body={meetings.length ? 'Try changing the filters to widen the view.' : 'Logged meetings will collect here, grouped by day.'} />}
+        </Rise>
+      )) : <EmptyState title={meetings.length ? 'No matching meetings' : 'Your archive is empty'} body={meetings.length ? 'Try changing the filters to widen the view.' : 'Logged meetings will collect here, grouped by day.'} action={meetings.length ? <Button label="Clear filters" variant="secondary" onPress={() => { setSentiment('all'); setType('all'); }} /> : undefined} />}
     </Screen>
   );
 }

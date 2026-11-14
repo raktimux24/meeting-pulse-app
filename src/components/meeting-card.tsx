@@ -1,7 +1,8 @@
 import { Clock3, Users } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
+import { PressableScale } from './motion';
 import { AppText, formatSigned } from './ui';
 import { MEETING_TYPE_LABELS, MOOD_CONFIG, REASON_MAP } from '@/domain/constants';
 import type { Meeting } from '@/domain/types';
@@ -15,11 +16,12 @@ export function MeetingCard({ meeting, onPress }: { meeting: Meeting; onPress: (
   const primaryReason = meeting.reasonIds[0] ? REASON_MAP[meeting.reasonIds[0]].label : MOOD_CONFIG[meeting.mood].short;
 
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       accessibilityLabel={`${meeting.title}, ${MOOD_CONFIG[meeting.mood].label}, ${meeting.impactScore >= 0 ? 'positive' : 'negative'} ${Math.abs(meeting.impactScore)} impact`}
       onPress={onPress}
-      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+      scaleTo={0.985}
+      style={styles.card}
     >
       <LinearGradient colors={positive ? ['rgba(25,58,51,0.82)', 'rgba(17,24,39,0.94)'] : neutral ? ['rgba(58,48,32,0.72)', 'rgba(17,24,39,0.94)'] : ['rgba(59,32,41,0.82)', 'rgba(17,24,39,0.94)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
       <View style={[styles.rail, { backgroundColor: accent }]} />
@@ -39,19 +41,18 @@ export function MeetingCard({ meeting, onPress }: { meeting: Meeting; onPress: (
           <View style={styles.reason}><AppText variant="small" style={{ color: accent }} numberOfLines={1}>{primaryReason}</AppText></View>
         </View>
       </View>
-    </Pressable>
+    </PressableScale>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { minHeight: 132, flexDirection: 'row', borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface, overflow: 'hidden', shadowColor: colors.shadow, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.24, shadowRadius: 18, elevation: 5 },
-  rail: { width: 5 },
-  content: { flex: 1, padding: spacing.md, gap: spacing.md },
+  card: { flexDirection: 'row', borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface, overflow: 'hidden', shadowColor: colors.shadow, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.24, shadowRadius: 18, elevation: 5 },
+  rail: { width: 4, borderRadius: 2, marginVertical: spacing.md, marginLeft: 12 },
+  content: { flex: 1, paddingVertical: spacing.md, paddingRight: spacing.md, paddingLeft: 12, gap: 12 },
   topRow: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
   score: { minWidth: 58, height: 46, borderRadius: 23, borderWidth: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 11, shadowColor: colors.shadow, shadowOpacity: 0.25, shadowRadius: 10 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   metaText: { color: colors.inkSoft },
   reason: { flex: 1, alignItems: 'flex-end' },
-  pressed: { opacity: 0.76, transform: [{ scale: 0.99 }] },
 });

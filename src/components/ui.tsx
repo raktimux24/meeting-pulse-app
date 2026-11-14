@@ -2,11 +2,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { Settings2 } from 'lucide-react-native';
 import type { PropsWithChildren, ReactNode } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
-  Pressable,
   ScrollView,
   StyleProp,
   StyleSheet,
@@ -17,7 +16,9 @@ import {
   ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
 
+import { PressableScale } from '@/components/motion';
 import { colors, fonts, gradients, radius, spacing } from '@/theme/tokens';
 
 export function AppText({
@@ -28,7 +29,7 @@ export function AppText({
   accessibilityLabel,
 }: PropsWithChildren<{
   style?: StyleProp<TextStyle>;
-  variant?: 'body' | 'small' | 'label' | 'title' | 'hero' | 'display';
+  variant?: 'body' | 'small' | 'label' | 'lead' | 'title' | 'hero' | 'display';
   numberOfLines?: number;
   accessibilityLabel?: TextProps['accessibilityLabel'];
 }>) {
@@ -44,9 +45,34 @@ const textVariants = StyleSheet.create({
   small: { fontFamily: fonts.body, fontSize: 13, lineHeight: 18 },
   label: { fontFamily: fonts.bodyBold, fontSize: 11, lineHeight: 15, letterSpacing: 1.35, textTransform: 'uppercase' },
   title: { fontFamily: fonts.bodyBold, fontSize: 20, lineHeight: 25, letterSpacing: -0.2 },
-  hero: { fontFamily: fonts.display, fontSize: 43, lineHeight: 44, letterSpacing: -1.5 },
+  lead: { fontFamily: fonts.bodyMedium, fontSize: 17, lineHeight: 25 },
+  hero: { fontFamily: fonts.display, fontSize: 43, lineHeight: 50, letterSpacing: -1.5 },
   display: { fontFamily: fonts.display, fontSize: 33, lineHeight: 36, letterSpacing: -0.9 },
 });
+
+/** Soft radial glow. Fades to transparent, so it never shows a hard edge. */
+export function Glow({ color, size, opacity = 0.22, style }: {
+  color: string;
+  size: number;
+  opacity?: number;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const id = `glow${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
+  return (
+    <View pointerEvents="none" style={[{ position: 'absolute', width: size, height: size }, style]}>
+      <Svg width={size} height={size} viewBox="0 0 100 100">
+        <Defs>
+          <RadialGradient id={id} cx="50" cy="50" r="50" gradientUnits="userSpaceOnUse">
+            <Stop offset="0" stopColor={color} stopOpacity={opacity} />
+            <Stop offset="0.55" stopColor={color} stopOpacity={opacity * 0.35} />
+            <Stop offset="1" stopColor={color} stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
+        <Circle cx="50" cy="50" r="50" fill={`url(#${id})`} />
+      </Svg>
+    </View>
+  );
+}
 
 export function Screen({
   children,
@@ -74,9 +100,8 @@ export function Screen({
     <SafeAreaView style={styles.safe} edges={topSafe ? ['top'] : []}>
       <StatusBar style="light" />
       <LinearGradient colors={gradients.screen} locations={[0, 0.52, 1]} style={StyleSheet.absoluteFill} />
-      <View pointerEvents="none" style={[styles.ambientOrb, styles.ambientOrbCoral]} />
-      <View pointerEvents="none" style={[styles.ambientOrb, styles.ambientOrbBlue]} />
-      <View pointerEvents="none" style={styles.gridOverlay} />
+      <Glow color={colors.orange} size={560} opacity={0.2} style={{ right: -300, top: -240 }} />
+      <Glow color={colors.blue} size={640} opacity={0.16} style={{ left: -420, top: 220 }} />
       {scroll ? (
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {content}
@@ -96,14 +121,14 @@ export function Header({ eyebrow, title, subtitle, onSettings, action }: {
   return (
     <View style={styles.header}>
       <View style={styles.headerCopy}>
-        <View style={styles.eyebrowRow}><View style={styles.eyebrowDot} /><AppText variant="label" style={styles.eyebrow}>{eyebrow}</AppText></View>
+        <View style={styles.eyebrowRow}><View style={styles.eyebrowDot} /><AppText variant="label" style={[styles.eyebrow, styles.eyebrowInRow]}>{eyebrow}</AppText></View>
         <AppText variant="display">{title}</AppText>
         {subtitle ? <AppText style={styles.muted}>{subtitle}</AppText> : null}
       </View>
       {action ?? (onSettings ? (
-        <Pressable accessibilityRole="button" accessibilityLabel="Open settings" hitSlop={8} onPress={onSettings} style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}>
+        <PressableScale accessibilityRole="button" accessibilityLabel="Open settings" hitSlop={8} onPress={onSettings} style={styles.iconButton} scaleTo={0.92}>
           <Settings2 color={colors.ink} size={21} strokeWidth={1.8} />
-        </Pressable>
+        </PressableScale>
       ) : null)}
     </View>
   );
@@ -120,27 +145,31 @@ export function GradientCard({ children, style, colors: gradientColors = gradien
   return <LinearGradient colors={gradientColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.card, styles.gradientCard, style]}>{children}</LinearGradient>;
 }
 
-export function Button({ label, onPress, icon, variant = 'primary', disabled, loading, style }: {
+export function Button({ label, onPress, icon, iconPosition = 'leading', variant = 'primary', disabled, loading, style }: {
   label: string;
   onPress: () => void;
   icon?: ReactNode;
+  /** Put arrows that mean "go forward" after the label. */
+  iconPosition?: 'leading' | 'trailing';
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
   disabled?: boolean;
   loading?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       accessibilityLabel={label}
       disabled={disabled || loading}
       onPress={onPress}
-      style={({ pressed }) => [styles.button, buttonVariants[variant], (disabled || loading) && styles.disabled, pressed && styles.pressed, style]}
+      haptic={variant === 'primary' ? 'light' : undefined}
+      style={[styles.button, buttonVariants[variant], (disabled || loading) && styles.disabled, style]}
     >
       {variant === 'primary' ? <LinearGradient colors={gradients.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} /> : null}
-      {loading ? <ActivityIndicator color={variant === 'primary' ? colors.white : colors.ink} /> : icon}
+      {loading ? <ActivityIndicator color={variant === 'primary' ? colors.onAccent : colors.ink} /> : iconPosition === 'leading' ? icon : null}
       <AppText style={[styles.buttonText, variant === 'primary' && styles.buttonTextPrimary, variant === 'danger' && styles.buttonTextDanger]}>{label}</AppText>
-    </Pressable>
+      {!loading && iconPosition === 'trailing' ? icon : null}
+    </PressableScale>
   );
 }
 
@@ -160,9 +189,9 @@ export function Pill({ label, selected = false, onPress, tone = 'default' }: {
   const toneStyle = tone === 'positive' ? styles.pillPositive : tone === 'negative' ? styles.pillNegative : undefined;
   const textTone = tone === 'positive' ? colors.moss : tone === 'negative' ? colors.wine : colors.ink;
   return (
-    <Pressable accessibilityRole={onPress ? 'button' : undefined} accessibilityState={{ selected }} onPress={onPress} disabled={!onPress} style={({ pressed }) => [styles.pill, toneStyle, selected && styles.pillSelected, pressed && styles.pressed]}>
-      <AppText variant="small" style={{ color: selected ? colors.white : textTone, fontFamily: fonts.bodyMedium }}>{label}</AppText>
-    </Pressable>
+    <PressableScale accessibilityRole={onPress ? 'button' : undefined} accessibilityState={{ selected }} onPress={onPress} disabled={!onPress} haptic="selection" scaleTo={0.94} style={[styles.pill, toneStyle, selected && styles.pillSelected]}>
+      <AppText variant="small" style={{ color: selected ? colors.onAccent : textTone, fontFamily: selected ? fonts.bodyBold : fonts.bodyMedium }}>{label}</AppText>
+    </PressableScale>
   );
 }
 
@@ -190,8 +219,10 @@ export function EmptyState({ title, body, action }: { title: string; body: strin
 }
 
 export function formatSigned(value: number) {
-  const normalized = Number.isInteger(value) ? value.toString() : value.toFixed(1);
-  return value > 0 ? `+${normalized}` : normalized;
+  const magnitude = Math.abs(value);
+  const normalized = Number.isInteger(magnitude) ? magnitude.toString() : magnitude.toFixed(1);
+  // U+2212 is a true minus sign; a hyphen is too short and sits low in the serif.
+  return value > 0 ? `+${normalized}` : value < 0 ? `\u2212${normalized}` : normalized;
 }
 
 const styles = StyleSheet.create({
@@ -203,15 +234,15 @@ const styles = StyleSheet.create({
   eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 7 },
   eyebrowDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.orange, shadowColor: colors.orange, shadowOpacity: 0.9, shadowRadius: 8 },
   eyebrow: { color: colors.orange, marginBottom: 6 },
+  eyebrowInRow: { marginBottom: 0 },
   header: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md },
   headerCopy: { flex: 1, gap: 4 },
   iconButton: { width: 48, height: 48, borderRadius: 24, borderWidth: 1, borderColor: colors.lineDark, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceGlass, shadowColor: colors.shadow, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.28, shadowRadius: 16, elevation: 5 },
-  pressed: { opacity: 0.78, transform: [{ scale: 0.975 }] },
   card: { borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surfaceGlass, padding: spacing.lg, shadowColor: colors.shadow, shadowOffset: { width: 0, height: 14 }, shadowOpacity: 0.22, shadowRadius: 24, elevation: 6 },
   gradientCard: { overflow: 'hidden' },
   button: { minHeight: 56, borderRadius: radius.round, borderWidth: 1, paddingHorizontal: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
   buttonText: { fontFamily: fonts.bodyBold },
-  buttonTextPrimary: { color: colors.white },
+  buttonTextPrimary: { color: colors.onAccent },
   buttonTextDanger: { color: colors.wine },
   disabled: { opacity: 0.4 },
   pill: { minHeight: 44, borderRadius: radius.round, borderWidth: 1, borderColor: colors.lineDark, paddingHorizontal: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(23,33,54,0.80)' },
@@ -222,8 +253,4 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', gap: spacing.md, paddingVertical: spacing.xl },
   emptyMark: { width: 68, height: 68, borderRadius: 34, borderWidth: 1, borderColor: colors.orange, backgroundColor: colors.orangeSoft, alignItems: 'center', justifyContent: 'center', shadowColor: colors.orange, shadowOpacity: 0.35, shadowRadius: 22 },
   emptyMarkInner: { width: 13, height: 13, borderRadius: 7, backgroundColor: colors.orange, shadowColor: colors.orange, shadowOpacity: 0.9, shadowRadius: 9 },
-  ambientOrb: { position: 'absolute', borderRadius: 999, opacity: 0.13 },
-  ambientOrbCoral: { width: 290, height: 290, backgroundColor: colors.orange, right: -175, top: -100, shadowColor: colors.orange, shadowOpacity: 0.9, shadowRadius: 90 },
-  ambientOrbBlue: { width: 330, height: 330, backgroundColor: colors.blue, left: -245, top: 310, shadowColor: colors.blue, shadowOpacity: 0.75, shadowRadius: 100 },
-  gridOverlay: { position: 'absolute', width: '140%', height: '120%', left: '-20%', top: '-10%', borderWidth: 1, borderColor: 'rgba(255,255,255,0.018)', transform: [{ rotate: '-8deg' }] },
 });

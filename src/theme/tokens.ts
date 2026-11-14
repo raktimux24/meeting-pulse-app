@@ -6,6 +6,9 @@ export const colors = {
   surfaceElevated: '#172136',
   surfaceGlass: 'rgba(23, 33, 54, 0.78)',
   white: '#FFFFFF',
+  /** Text and icons on the coral accent. White on coral is only 2.6:1. */
+  onAccent: '#1E0F0B',
+  placeholder: '#7C879C',
   line: 'rgba(255, 255, 255, 0.10)',
   lineDark: 'rgba(255, 255, 255, 0.20)',
   orange: '#FF7958',
