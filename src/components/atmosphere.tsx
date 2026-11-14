@@ -42,7 +42,8 @@ export function Atmosphere() {
       </Svg>
       <LinearGradient
         colors={['rgba(255,121,88,0.16)', 'rgba(255,121,88,0.03)', 'transparent']}
-        locations={[0, 0.42, 1]}
+        // Reaches transparent before the box's bottom edge, so the band never ends in a visible line.
+        locations={[0, 0.2, 0.42]}
         start={{ x: 1, y: 0 }}
         end={{ x: 0.2, y: 0.55 }}
         style={styles.horizon}

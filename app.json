@@ -57,6 +57,15 @@
           "dark": {
             "backgroundColor": "#070A12",
             "image": "./assets/images/splash-mark.png"
+          },
+          "ios": {
+            "image": "./assets/images/splash-screen.png",
+            "enableFullScreenImage_legacy": true,
+            "resizeMode": "cover",
+            "dark": {
+              "backgroundColor": "#070A12",
+              "image": "./assets/images/splash-screen.png"
+            }
           }
         }
       ],
