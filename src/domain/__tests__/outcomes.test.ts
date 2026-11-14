@@ -19,6 +19,7 @@ function meeting(index: number, overrides: Partial<Meeting> = {}): Meeting {
     ownershipStatus: null,
     nextStepStatus: null,
     intendedOutcome: null,
+    intendedOutcomeMet: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     ...overrides,

@@ -13,6 +13,9 @@ export type Mood = (typeof MOODS)[number];
 
 export const OUTCOME_STATUSES = ['yes', 'no', 'not-needed'] as const;
 export type OutcomeStatus = (typeof OUTCOME_STATUSES)[number];
+/** Answer to "Did it produce what you intended?" — only asked when an intended outcome was written. */
+export const INTENDED_OUTCOME_RESULTS = ['yes', 'partly', 'no'] as const;
+export type IntendedOutcomeResult = (typeof INTENDED_OUTCOME_RESULTS)[number];
 
 export const MEETING_TYPES = [
   'standup',
@@ -88,11 +91,12 @@ export type Meeting = {
   ownershipStatus: OutcomeStatus | null;
   nextStepStatus: OutcomeStatus | null;
   intendedOutcome: string | null;
+  intendedOutcomeMet: IntendedOutcomeResult | null;
   createdAt: string;
   updatedAt: string;
 };
 
-type OptionalReflectionFields = Pick<Meeting, 'decisionStatus' | 'ownershipStatus' | 'nextStepStatus' | 'intendedOutcome'>;
+type OptionalReflectionFields = Pick<Meeting, 'decisionStatus' | 'ownershipStatus' | 'nextStepStatus' | 'intendedOutcome' | 'intendedOutcomeMet'>;
 
 export type MeetingInput = Omit<Meeting, 'id' | 'impactScore' | 'createdAt' | 'updatedAt' | keyof OptionalReflectionFields> &
   Partial<OptionalReflectionFields>;

@@ -391,14 +391,14 @@ export default function SettingsScreen() {
         <Card style={styles.methodCard}>
           <View style={styles.iconDisc}><Info size={20} color={colors.orange} /></View>
           <View style={{ flex: 1, gap: 5 }}>
-            <AppText variant="title">Mood × duration + reasons</AppText>
-            <AppText style={{ color: colors.inkSoft }}>A meeting’s stored score combines how it left you feeling, how long it ran, and the signals you selected. Weekly notes are rule-based on this device. The score is not a clinical or performance assessment.</AppText>
+            <AppText variant="title">Mood × duration + reasons + outcomes</AppText>
+            <AppText style={{ color: colors.inkSoft }}>A meeting’s stored score combines how it left you feeling, how long it ran, and the signals you selected. Reasons and outcome answers can each move it by up to ±3. In the outcome check, each yes adds 1 and each no takes 1 away; an intended outcome that was met adds 1.5 (partly 0.5, not met −1.5). A “no” is not counted twice when you already picked “No decision” or “Unclear ownership”. Weekly notes are rule-based on this device. The score is not a clinical or performance assessment.</AppText>
           </View>
         </Card>
         <Card style={styles.exampleCard}>
           <AppText variant="label" style={{ color: colors.orange }}>Worked example</AppText>
           <AppText variant="title">Clear (+2) × 30 min (1.2×) + Clear outcome (+2) = +4.4</AppText>
-          <AppText style={{ color: colors.inkSoft }}>Longer meetings amplify the mood. Reasons nudge the result up or down. That is the whole model.</AppText>
+          <AppText style={{ color: colors.inkSoft }}>Longer meetings amplify the mood. Reasons and outcome answers nudge the result up or down. That is the whole model.</AppText>
         </Card>
         <Button label="Replay the scoring tour" variant="ghost" onPress={() => router.push('/onboarding')} />
       </View>

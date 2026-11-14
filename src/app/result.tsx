@@ -10,8 +10,8 @@ import { Rise, useRollingNumber } from '@/components/motion';
 import { AppText, Button, Card, formatSigned, Glow, LoadingState, NotFoundState, Screen } from '@/components/ui';
 import { MOOD_CONFIG } from '@/domain/constants';
 import { originPath } from '@/domain/format';
-import { answeredOutcomeCount, OUTCOME_STATUS_LABELS } from '@/domain/outcomes';
-import { getDurationMultiplier, getImpactLabel, getMeetingSuggestion, getReasonModifier } from '@/domain/scoring';
+import { answeredOutcomeCount, INTENDED_OUTCOME_LABELS, OUTCOME_STATUS_LABELS } from '@/domain/outcomes';
+import { getImpactLabel, getMeetingSuggestion, getScoreBreakdown } from '@/domain/scoring';
 import type { Meeting } from '@/domain/types';
 import { useAppData } from '@/providers/app-data-provider';
 import { colors, gradients, radius, spacing } from '@/theme/tokens';
@@ -56,9 +56,8 @@ function ResultContent({ meeting, edited, from }: { meeting: Meeting; edited: bo
   const positive = meeting.impactScore > 0;
   const neutral = meeting.impactScore === 0;
   const tone = positive ? colors.moss : neutral ? colors.amber : colors.wine;
-  const moodBase = MOOD_CONFIG[meeting.mood].score;
-  const multiplier = getDurationMultiplier(meeting.durationMinutes);
-  const modifier = getReasonModifier(meeting.reasonIds);
+  const { moodBase, multiplier, reasons: modifier, outcomes: outcomePoints } = getScoreBreakdown(meeting.mood, meeting.durationMinutes, meeting.reasonIds, meeting);
+  const hasOutcomeAnswers = answeredOutcomeCount(meeting) > 0 || Boolean(meeting.intendedOutcome && meeting.intendedOutcomeMet);
   const home = originPath(from);
 
   // The payoff moment: the ring draws, then the score counts up inside it.
@@ -111,6 +110,12 @@ function ResultContent({ meeting, edited, from }: { meeting: Meeting; edited: bo
             <MathPart value={`${multiplier}`} label={`${meeting.durationMinutes} min`} />
             <AppText variant="title" style={styles.operator}>+</AppText>
             <MathPart value={formatSigned(modifier)} label="Reasons" />
+            {hasOutcomeAnswers ? (
+              <>
+                <AppText variant="title" style={styles.operator}>+</AppText>
+                <MathPart value={formatSigned(outcomePoints)} label="Outcomes" />
+              </>
+            ) : null}
             <AppText variant="title" style={styles.operator}>=</AppText>
             <MathPart value={formatSigned(meeting.impactScore)} label="Impact" />
           </View>
@@ -120,7 +125,7 @@ function ResultContent({ meeting, edited, from }: { meeting: Meeting; edited: bo
       {answeredOutcomeCount(meeting) ? (
         <Rise delay={760} style={styles.full}>
           <Card style={styles.outcomeCard}>
-            <AppText variant="label" style={{ color: colors.inkSoft }}>Outcome clarity · does not affect the score</AppText>
+            <AppText variant="label" style={{ color: colors.inkSoft }}>Outcome check</AppText>
             {meeting.decisionStatus ? <OutcomeLine label="Decision made" value={OUTCOME_STATUS_LABELS[meeting.decisionStatus]} /> : null}
             {meeting.ownershipStatus ? <OutcomeLine label="Ownership clear" value={OUTCOME_STATUS_LABELS[meeting.ownershipStatus]} /> : null}
             {meeting.nextStepStatus ? <OutcomeLine label="Next step clear" value={OUTCOME_STATUS_LABELS[meeting.nextStepStatus]} /> : null}
@@ -133,6 +138,7 @@ function ResultContent({ meeting, edited, from }: { meeting: Meeting; edited: bo
           <Card style={styles.outcomeCard}>
             <AppText variant="label" style={{ color: colors.inkSoft }}>Intended outcome · private</AppText>
             <AppText variant="lead">{meeting.intendedOutcome}</AppText>
+            {meeting.intendedOutcomeMet ? <OutcomeLine label="Produced" value={INTENDED_OUTCOME_LABELS[meeting.intendedOutcomeMet]} /> : null}
           </Card>
         </Rise>
       ) : null}

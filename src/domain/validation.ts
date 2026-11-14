@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { MEETING_TYPE_SLUG } from './meeting-types';
-import { MOODS, OUTCOME_STATUSES } from './types';
+import { INTENDED_OUTCOME_RESULTS, MOODS, OUTCOME_STATUSES } from './types';
 
 export const meetingTypeSchema = z
   .string()
@@ -34,6 +34,7 @@ export const exportedMeetingSchema = z.object({
   ownershipStatus: z.enum(OUTCOME_STATUSES).nullable().optional().default(null),
   nextStepStatus: z.enum(OUTCOME_STATUSES).nullable().optional().default(null),
   intendedOutcome: z.string().trim().max(160).nullable().optional().default(null),
+  intendedOutcomeMet: z.enum(INTENDED_OUTCOME_RESULTS).nullable().optional().default(null),
   impactScore: z.number().optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),

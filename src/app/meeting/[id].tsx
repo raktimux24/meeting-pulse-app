@@ -9,7 +9,7 @@ import { AppText, Button, Card, LoadingState, NotFoundState, formatSigned, Gradi
 import { MOOD_CONFIG, REASON_MAP } from '@/domain/constants';
 import { meetingTypeLabel } from '@/domain/meeting-types';
 import { originPath } from '@/domain/format';
-import { answeredOutcomeCount, OUTCOME_STATUS_LABELS } from '@/domain/outcomes';
+import { answeredOutcomeCount, INTENDED_OUTCOME_LABELS, OUTCOME_STATUS_LABELS } from '@/domain/outcomes';
 import { getImpactLabel, getMeetingSuggestion } from '@/domain/scoring';
 import type { Meeting } from '@/domain/types';
 import { useAppData } from '@/providers/app-data-provider';
@@ -85,11 +85,11 @@ export default function MeetingDetailScreen() {
         }) : <AppText style={{ color: colors.inkSoft }}>No reasons selected.</AppText>}</View>
       </Rise>
 
-      {meeting.intendedOutcome ? <Card style={styles.section}><AppText variant="label" style={{ color: colors.inkSoft }}>Intended outcome · private</AppText><AppText variant="title">{meeting.intendedOutcome}</AppText></Card> : null}
+      {meeting.intendedOutcome ? <Card style={styles.section}><AppText variant="label" style={{ color: colors.inkSoft }}>Intended outcome · private</AppText><AppText variant="title">{meeting.intendedOutcome}</AppText>{meeting.intendedOutcomeMet ? <Detail label="Produced" value={INTENDED_OUTCOME_LABELS[meeting.intendedOutcomeMet]} /> : null}</Card> : null}
 
       {answeredOutcomeCount(meeting) ? (
         <Card style={styles.section}>
-          <AppText variant="label" style={{ color: colors.inkSoft }}>Outcome clarity · separate from the score</AppText>
+          <AppText variant="label" style={{ color: colors.inkSoft }}>Outcome check</AppText>
           {meeting.decisionStatus ? <Detail label="Decision made" value={OUTCOME_STATUS_LABELS[meeting.decisionStatus]} /> : null}
           {meeting.ownershipStatus ? <Detail label="Ownership clear" value={OUTCOME_STATUS_LABELS[meeting.ownershipStatus]} /> : null}
           {meeting.nextStepStatus ? <Detail label="Next step clear" value={OUTCOME_STATUS_LABELS[meeting.nextStepStatus]} /> : null}

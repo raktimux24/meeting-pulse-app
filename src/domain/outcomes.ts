@@ -1,10 +1,16 @@
 import { meetingTypeLabel } from './meeting-types';
-import type { Insight, Meeting, OutcomeStatus } from './types';
+import type { Insight, IntendedOutcomeResult, Meeting, OutcomeStatus } from './types';
 
 export const OUTCOME_STATUS_LABELS: Record<OutcomeStatus, string> = {
   yes: 'Yes',
   no: 'No',
   'not-needed': 'Not needed',
+};
+
+export const INTENDED_OUTCOME_LABELS: Record<IntendedOutcomeResult, string> = {
+  yes: 'Yes',
+  partly: 'Partly',
+  no: 'No',
 };
 
 type OutcomeField = 'decisionStatus' | 'ownershipStatus' | 'nextStepStatus';

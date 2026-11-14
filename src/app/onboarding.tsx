@@ -79,7 +79,7 @@ export default function OnboardingScreen() {
       ) : (
         <Rise style={styles.copy}>
           <AppText variant="hero" style={compact && styles.headingCompact}>A score, not a verdict.</AppText>
-          <AppText style={[styles.subtitle, compact && styles.subtitleCompact]}>Mood × duration + the reasons you tap. Weekly notes are simple rules on this device—not a model, and not a performance review.</AppText>
+          <AppText style={[styles.subtitle, compact && styles.subtitleCompact]}>Mood × duration, plus the reasons you tap and whether the meeting got its outcome. Weekly notes are simple rules on this device—not a model, and not a performance review.</AppText>
           <Card style={styles.example}>
             <AppText variant="label" style={{ color: colors.orange }}>Example</AppText>
             <AppText variant="title">Clear (+2) × 30 min (1.2×) + Clear outcome (+2) = +4.4</AppText>

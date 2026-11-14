@@ -19,6 +19,7 @@ function meeting(id: string, occurredAt: string, impactScore: number): Meeting {
     ownershipStatus: null,
     nextStepStatus: null,
     intendedOutcome: null,
+    intendedOutcomeMet: null,
     createdAt: occurredAt,
     updatedAt: occurredAt,
   };

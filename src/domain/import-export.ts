@@ -50,6 +50,7 @@ export function parseExportPayload(raw: unknown): ImportPreview {
       ownershipStatus: parsed.data.ownershipStatus,
       nextStepStatus: parsed.data.nextStepStatus,
       intendedOutcome: parsed.data.intendedOutcome,
+      intendedOutcomeMet: parsed.data.intendedOutcomeMet,
     });
   });
 

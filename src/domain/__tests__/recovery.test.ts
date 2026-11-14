@@ -19,6 +19,7 @@ function meeting(id: string, hour: number, minute: number, durationMinutes: numb
     ownershipStatus: null,
     nextStepStatus: null,
     intendedOutcome: null,
+    intendedOutcomeMet: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };

@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { calculateImpactScore } from '@/domain/scoring';
-import type { Meeting, MeetingInput, MeetingType, Mood, OutcomeStatus, QuickPulse } from '@/domain/types';
+import type { IntendedOutcomeResult, Meeting, MeetingInput, MeetingType, Mood, OutcomeStatus, QuickPulse } from '@/domain/types';
 
 type MeetingRow = {
   id: string;
@@ -17,6 +17,7 @@ type MeetingRow = {
   ownership_status: string | null;
   next_step_status: string | null;
   intended_outcome: string | null;
+  intended_outcome_met: string | null;
   created_at: string;
   updated_at: string;
   reason_ids: string | null;
@@ -40,8 +41,9 @@ function meetingFromInput(input: MeetingInput): Meeting {
     ownershipStatus: input.ownershipStatus ?? null,
     nextStepStatus: input.nextStepStatus ?? null,
     intendedOutcome: input.intendedOutcome?.trim() || null,
+    intendedOutcomeMet: input.intendedOutcome?.trim() ? input.intendedOutcomeMet ?? null : null,
     id: makeId(),
-    impactScore: calculateImpactScore(input.mood, input.durationMinutes, input.reasonIds),
+    impactScore: calculateImpactScore(input.mood, input.durationMinutes, input.reasonIds, input),
     createdAt: now,
     updatedAt: now,
   };
@@ -51,8 +53,8 @@ async function insertMeetingRecord(db: SQLiteDatabase, meeting: Meeting): Promis
   await db.runAsync(
     `INSERT INTO meetings
       (id, title, occurred_at, duration_minutes, meeting_type, people_count, note, mood, impact_score,
-       decision_status, ownership_status, next_step_status, intended_outcome, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       decision_status, ownership_status, next_step_status, intended_outcome, intended_outcome_met, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     meeting.id,
     meeting.title,
     meeting.occurredAt,
@@ -66,6 +68,7 @@ async function insertMeetingRecord(db: SQLiteDatabase, meeting: Meeting): Promis
     meeting.ownershipStatus,
     meeting.nextStepStatus,
     meeting.intendedOutcome,
+    meeting.intendedOutcomeMet,
     meeting.createdAt,
     meeting.updatedAt,
   );
@@ -90,6 +93,7 @@ function mapMeeting(row: MeetingRow): Meeting {
     ownershipStatus: row.ownership_status as OutcomeStatus | null,
     nextStepStatus: row.next_step_status as OutcomeStatus | null,
     intendedOutcome: row.intended_outcome,
+    intendedOutcomeMet: (row.intended_outcome_met ?? null) as IntendedOutcomeResult | null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -132,7 +136,8 @@ export async function updateMeeting(
     ownershipStatus: input.ownershipStatus ?? null,
     nextStepStatus: input.nextStepStatus ?? null,
     intendedOutcome: input.intendedOutcome?.trim() || null,
-    impactScore: calculateImpactScore(input.mood, input.durationMinutes, input.reasonIds),
+    intendedOutcomeMet: input.intendedOutcome?.trim() ? input.intendedOutcomeMet ?? null : null,
+    impactScore: calculateImpactScore(input.mood, input.durationMinutes, input.reasonIds, input),
     updatedAt: new Date().toISOString(),
   };
 
@@ -141,7 +146,7 @@ export async function updateMeeting(
       `UPDATE meetings SET
         title = ?, occurred_at = ?, duration_minutes = ?, meeting_type = ?, people_count = ?,
         note = ?, mood = ?, impact_score = ?, decision_status = ?, ownership_status = ?,
-        next_step_status = ?, intended_outcome = ?, updated_at = ? WHERE id = ?`,
+        next_step_status = ?, intended_outcome = ?, intended_outcome_met = ?, updated_at = ? WHERE id = ?`,
       meeting.title,
       meeting.occurredAt,
       meeting.durationMinutes,
@@ -154,6 +159,7 @@ export async function updateMeeting(
       meeting.ownershipStatus,
       meeting.nextStepStatus,
       meeting.intendedOutcome,
+      meeting.intendedOutcomeMet,
       meeting.updatedAt,
       id,
     );
@@ -215,8 +221,8 @@ export async function restoreMeeting(db: SQLiteDatabase, meeting: Meeting): Prom
     await db.runAsync(
       `INSERT INTO meetings
         (id, title, occurred_at, duration_minutes, meeting_type, people_count, note, mood, impact_score,
-         decision_status, ownership_status, next_step_status, intended_outcome, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         decision_status, ownership_status, next_step_status, intended_outcome, intended_outcome_met, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       meeting.id,
       meeting.title,
       meeting.occurredAt,
@@ -230,6 +236,7 @@ export async function restoreMeeting(db: SQLiteDatabase, meeting: Meeting): Prom
       meeting.ownershipStatus,
       meeting.nextStepStatus,
       meeting.intendedOutcome,
+      meeting.intendedOutcomeMet,
       meeting.createdAt,
       meeting.updatedAt,
     );

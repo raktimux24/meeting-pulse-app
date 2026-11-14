@@ -15,9 +15,9 @@ import { MOOD_CONFIG, REASONS } from '@/domain/constants';
 import { catalogMeetingTypes } from '@/domain/meeting-types';
 import { defaultPeopleCount, lastPeopleByType, lastUsedDefaults, recentTitles } from '@/domain/defaults';
 import { mergeDateTimePart, type DateTimePart } from '@/domain/date-time';
-import { calculateImpactScore, getImpactLabel } from '@/domain/scoring';
-import { OUTCOME_STATUS_LABELS } from '@/domain/outcomes';
-import { MOODS, type CustomReason, type Meeting, type MeetingType, type Mood, type OutcomeStatus } from '@/domain/types';
+import { calculateImpactScore, getImpactLabel, getOutcomeModifier } from '@/domain/scoring';
+import { INTENDED_OUTCOME_LABELS, OUTCOME_STATUS_LABELS } from '@/domain/outcomes';
+import { INTENDED_OUTCOME_RESULTS, MOODS, type CustomReason, type IntendedOutcomeResult, type Meeting, type MeetingType, type Mood, type OutcomeStatus } from '@/domain/types';
 import { meetingDetailsSchema, type MeetingDetailsInput } from '@/domain/validation';
 import { useAppData } from '@/providers/app-data-provider';
 import { colors, fonts, radius, spacing } from '@/theme/tokens';
@@ -45,6 +45,7 @@ export default function LogMeetingScreen() {
   const [ownershipStatus, setOwnershipStatus] = useState<OutcomeStatus | null>(null);
   const [nextStepStatus, setNextStepStatus] = useState<OutcomeStatus | null>(null);
   const [intendedOutcome, setIntendedOutcome] = useState('');
+  const [intendedOutcomeMet, setIntendedOutcomeMet] = useState<IntendedOutcomeResult | null>(null);
   const [showIntendedOutcome, setShowIntendedOutcome] = useState(false);
   const [history, setHistory] = useState<Meeting[]>([]);
   const [hasAdvanced, setHasAdvanced] = useState(false);
@@ -87,8 +88,9 @@ export default function LogMeetingScreen() {
       setOwnershipStatus(meeting.ownershipStatus);
       setNextStepStatus(meeting.nextStepStatus);
       setIntendedOutcome(meeting.intendedOutcome ?? '');
+      setIntendedOutcomeMet(meeting.intendedOutcomeMet);
       setShowIntendedOutcome(Boolean(meeting.intendedOutcome));
-      setShowOutcomeCheck(Boolean(meeting.decisionStatus || meeting.ownershipStatus || meeting.nextStepStatus));
+      setShowOutcomeCheck(Boolean(meeting.decisionStatus || meeting.ownershipStatus || meeting.nextStepStatus || meeting.intendedOutcomeMet));
       setShowNote(Boolean(meeting.note));
     }).finally(() => setLoadingEdit(false));
   }, [getById, id, reset]);
@@ -112,7 +114,10 @@ export default function LogMeetingScreen() {
   const pickerMaximum = new Date();
   const maximumTime = isSameDay(occurredAt, pickerMaximum) ? pickerMaximum : undefined;
   const titles = useMemo(() => recentTitles(history), [history]);
-  const previewScore = mood ? calculateImpactScore(mood, duration, reasonIds) : null;
+  const hasIntendedOutcome = intendedOutcome.trim().length > 0;
+  const outcomeSignals = { decisionStatus, ownershipStatus, nextStepStatus, intendedOutcome, intendedOutcomeMet };
+  const outcomePoints = getOutcomeModifier(outcomeSignals, reasonIds);
+  const previewScore = mood ? calculateImpactScore(mood, duration, reasonIds, outcomeSignals) : null;
 
   // autoFocus fires while the modal is still animating in, so early keystrokes were lost.
   // Focus once the sheet has settled instead (new meetings only).
@@ -124,6 +129,8 @@ export default function LogMeetingScreen() {
 
   const next = async () => {
     if (await trigger()) {
+      // An intended outcome needs its "did it happen?" answer, so open the outcome check for it.
+      if (hasIntendedOutcome) setShowOutcomeCheck(true);
       setHasAdvanced(true);
       setStep(2);
     }
@@ -154,6 +161,7 @@ export default function LogMeetingScreen() {
         ownershipStatus,
         nextStepStatus,
         intendedOutcome: intendedOutcome.trim() || null,
+        intendedOutcomeMet: hasIntendedOutcome ? intendedOutcomeMet : null,
       };
       const meeting = id
         ? await update(id, input)
@@ -368,12 +376,30 @@ export default function LogMeetingScreen() {
             <Pressable accessibilityRole="button" accessibilityState={{ expanded: showOutcomeCheck }} onPress={() => setShowOutcomeCheck((value) => !value)} style={styles.disclosure}>
               <View style={{ flex: 1, gap: 3 }}>
                 <AppText variant="title">Outcome check · optional</AppText>
-                <AppText variant="small" style={{ color: colors.inkSoft }}>A separate signal. It does not change your impact score.</AppText>
+                <AppText variant="small" style={{ color: colors.inkSoft }}>
+                  {outcomePoints !== 0 ? `Adding ${formatSigned(outcomePoints)} to your impact score.` : 'Each answer can move the score, up to ±3 in total.'}
+                </AppText>
               </View>
               <ChevronDown size={18} color={colors.inkSoft} style={{ transform: [{ rotate: showOutcomeCheck ? '180deg' : '0deg' }] }} />
             </Pressable>
             {showOutcomeCheck ? (
               <Card style={styles.outcomeCard}>
+                {hasIntendedOutcome ? (
+                  <View style={styles.question}>
+                    <AppText variant="title">Did it produce “{intendedOutcome.trim()}”?</AppText>
+                    <View style={styles.pills}>
+                      {INTENDED_OUTCOME_RESULTS.map((option) => (
+                        <Pill
+                          key={option}
+                          label={INTENDED_OUTCOME_LABELS[option]}
+                          selected={intendedOutcomeMet === option}
+                          tone={option === 'no' ? 'negative' : option === 'yes' ? 'positive' : 'default'}
+                          onPress={() => setIntendedOutcomeMet((current) => current === option ? null : option)}
+                        />
+                      ))}
+                    </View>
+                  </View>
+                ) : null}
                 <OutcomeQuestion label="Was a decision made?" value={decisionStatus} onChange={setDecisionStatus} />
                 {decisionStatus === 'yes' && reasonIds.includes('no-decision') ? <AppText variant="small" style={styles.warning}>You also selected “No decision.” Keep the answer that best reflects the meeting.</AppText> : null}
                 <OutcomeQuestion label="Is ownership clear?" value={ownershipStatus} onChange={setOwnershipStatus} />
